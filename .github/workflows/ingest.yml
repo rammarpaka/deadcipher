@@ -1,0 +1,40 @@
+name: Ingest RSS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "pipeline/**"
+      - "requirements.txt"
+      - ".github/workflows/ingest.yml"
+  schedule:
+    # Offset minutes avoid the top-of-hour GitHub Actions pile-up.
+    # 15 minutes is the practical free-tier cadence; 5-minute cron burns minutes
+    # and is frequently delayed or dropped.
+    - cron: "7,22,37,52 * * * *"
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Read RSS and scrape newest items
+        run: python -m pipeline --max-items 6 --output artifacts/ingest.json
+
+      - name: Upload ingest report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-report
+          path: artifacts/ingest.json
+          if-no-files-found: error

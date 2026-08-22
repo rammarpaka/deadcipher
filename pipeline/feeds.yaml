@@ -1,0 +1,16 @@
+# RSS is the notification layer. Keep this list small on the free Gemini quota.
+# Prefer feeds that include a usable summary so scrape fallback is optional.
+
+feeds:
+  - id: bleepingcomputer
+    name: BleepingComputer
+    url: https://www.bleepingcomputer.com/feed/
+  - id: cisa-advisories
+    name: CISA Cybersecurity Advisories
+    url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+  - id: thehackernews
+    name: The Hacker News
+    url: https://feeds.feedburner.com/TheHackersNews
+  - id: krebsonsecurity
+    name: Krebs on Security
+    url: https://krebsonsecurity.com/feed/
