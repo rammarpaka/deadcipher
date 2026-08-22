@@ -6,8 +6,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from pipeline.ingest import default_client, ingest_feeds, load_feeds
 from pipeline.scrape import scrape_client, scrape_items
+from pipeline.supabase_export import connect, export_items, is_configured, known_urls
 
 ROOT = Path(__file__).resolve().parent
 FEEDS_PATH = ROOT / "feeds.yaml"
@@ -27,6 +30,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    load_dotenv()
     args = parse_args()
     feeds = load_feeds(FEEDS_PATH)
 
@@ -44,16 +48,31 @@ def main() -> int:
     unique.sort(key=lambda item: item.published_at or "", reverse=True)
     selected = unique[: args.max_items]
 
+    db = None
+    already_tracked = 0
+    if is_configured():
+        db = connect()
+        tracked = known_urls(db, [item.url for item in selected])
+        already_tracked = len(tracked)
+        selected = [item for item in selected if item.url not in tracked]
+
     if not args.no_scrape:
         with scrape_client() as client:
             scrape_items(selected, client)
+
+    export_stats = {"inserted": 0, "skipped": 0}
+    if db is not None:
+        export_stats = export_items(db, selected)
 
     report = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "feeds_configured": len(feeds),
         "items_from_rss": len(items),
         "unique_urls": len(unique),
+        "already_tracked": already_tracked,
         "selected": len(selected),
+        "supabase_configured": db is not None,
+        "supabase_export": export_stats,
         "feed_failures": failures,
         "items": [item.to_dict() for item in selected],
     }
@@ -63,6 +82,7 @@ def main() -> int:
 
     print(f"Feeds configured: {len(feeds)}")
     print(f"RSS items: {len(items)} unique={len(unique)}")
+    print(f"Supabase: configured={db is not None} skipped_known={already_tracked} {export_stats}")
     if failures:
         print("Feed failures:")
         for failure in failures:
@@ -86,6 +106,7 @@ def _write_github_summary(report: dict) -> None:
         f"- Ran at: `{report['ran_at']}`",
         f"- Feeds: {report['feeds_configured']}",
         f"- RSS items: {report['items_from_rss']} unique={report['unique_urls']}",
+        f"- Supabase: configured={report['supabase_configured']} export={report['supabase_export']}",
         "",
     ]
     if report["feed_failures"]:

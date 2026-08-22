@@ -10,6 +10,8 @@ dependencies = [
   "lxml-html-clean==0.4.2",
   "PyYAML==6.0.2",
   "python-dateutil==2.9.0.post0",
+  "python-dotenv==1.1.1",
+  "supabase==2.18.1",
 ]
 
 [tool.uv]

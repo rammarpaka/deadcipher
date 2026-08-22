@@ -1,6 +1,8 @@
 name: Ingest RSS
 
 on:
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_dispatch:
   push:
     branches: [main, master]
@@ -10,10 +12,17 @@ on:
       - "uv.lock"
       - ".github/workflows/ingest.yml"
 
+concurrency:
+  group: rss-ingest
+  cancel-in-progress: false
+
 jobs:
-  log-rss:
+  ingest-rss:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,5 +34,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Log RSS headlines (no scrape, no database)
+      - name: Ingest RSS feeds (dedupe + export to Supabase)
         run: uv run python -m pipeline --no-scrape --max-items 12 --output artifacts/ingest.json
