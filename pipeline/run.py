@@ -17,9 +17,21 @@ ROOT = Path(__file__).resolve().parent
 FEEDS_PATH = ROOT / "feeds.yaml"
 
 
+def _max_items_default() -> int:
+    try:
+        return max(1, int(os.environ.get("MAX_ITEMS") or ""))
+    except ValueError:
+        return 15
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ingest cybersecurity RSS feeds.")
-    parser.add_argument("--max-items", type=int, default=8, help="Cap items to scrape this run.")
+    parser.add_argument(
+        "--max-items",
+        type=int,
+        default=_max_items_default(),
+        help="Cap items to scrape this run (env: MAX_ITEMS).",
+    )
     parser.add_argument("--no-scrape", action="store_true", help="Only read RSS, skip article fetch.")
     parser.add_argument(
         "--no-synthesize", action="store_true", help="Skip Gemini synthesis step."

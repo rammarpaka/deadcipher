@@ -27,6 +27,7 @@ jobs:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
       LLM_MODEL: ${{ vars.LLM_MODEL }}
+      MAX_ITEMS: ${{ vars.MAX_ITEMS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,4 +40,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Ingest RSS feeds (dedupe + scrape + export to Supabase)
-        run: uv run python -m pipeline --max-items 12 --output artifacts/ingest.json
+        run: uv run python -m pipeline --output artifacts/ingest.json
