@@ -19,6 +19,7 @@ concurrency:
 jobs:
   ingest-rss:
     runs-on: ubuntu-latest
+    environment: PROD
     timeout-minutes: 5
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
