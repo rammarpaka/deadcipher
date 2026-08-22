@@ -28,16 +28,21 @@ SYSTEM_INSTRUCTION = (
 PROMPT_TEMPLATE = """Synthesize an ORIGINAL news report from the source articles below, which all cover the same event or topic.
 
 STRICT RULES:
-1. Write 2-5 short paragraphs of entirely original prose. Never copy any sentence verbatim from the sources.
+1. Write 2-6 short paragraphs of entirely original prose. Never copy any sentence verbatim from the sources.
 2. Every fact must come from the given sources only. Do not add outside knowledge.
 3. Each paragraph must include exactly one "citation_source_url" taken verbatim from that source's "url" field.
-4. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
-5. Respond with ONLY a JSON object, no markdown fences, matching:
+4. Spread the reporting across sources: consecutive paragraphs must cite DIFFERENT urls, and every provided source url must be cited at least once.
+5. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
+6. Respond with ONLY a JSON object, no markdown fences, matching:
    {{"headline": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
 
 SOURCE ARTICLES:
 {sources}
 """
+
+DIVERSITY_NUDGE = """
+
+MANDATORY CORRECTION: Your previous draft drew all citations from a single source. Rewrite it so each paragraph reports details from a DIFFERENT source url and every provided source url appears as a citation at least once."""
 
 
 class Article:
@@ -154,20 +159,30 @@ def _validate_story(data: object, allowed_urls: set[str]) -> tuple[str, list[dic
     return headline, cleaned
 
 
-def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]:
-    sources = "\n\n".join(article.to_prompt_block() for article in cluster)
-    _base_url, model, _api_key = _llm_config()
+def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> tuple[str, list[dict]]:
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_INSTRUCTION},
-            {"role": "user", "content": PROMPT_TEMPLATE.format(sources=sources)},
+            {"role": "user", "content": prompt},
         ],
         response_format={"type": "json_object"},
     )
-    story = _validate_story(json.loads(response.choices[0].message.content), {a.url for a in cluster})
+    story = _validate_story(json.loads(response.choices[0].message.content), allowed_urls)
     if story is None:
         raise ValueError("model returned invalid story structure")
+    return story
+
+
+def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]:
+    sources = "\n\n".join(article.to_prompt_block() for article in cluster)
+    allowed_urls = {a.url for a in cluster}
+    _base_url, model, _api_key = _llm_config()
+    prompt = PROMPT_TEMPLATE.format(sources=sources)
+    story = _attempt(client, model, prompt, allowed_urls)
+    single_cited = len(cluster) > 1 and len({p["citation_source_url"] for p in story[1]}) == 1
+    if single_cited:
+        story = _attempt(client, model, prompt + DIVERSITY_NUDGE, allowed_urls)
     return story
 
 
