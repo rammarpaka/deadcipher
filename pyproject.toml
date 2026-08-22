@@ -1,0 +1,16 @@
+[project]
+name = "deadcipher"
+version = "0.1.0"
+description = "Cybersecurity RSS ingest and article scrape pipeline"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "feedparser==6.0.11",
+  "httpx==0.28.1",
+  "trafilatura==2.0.0",
+  "lxml-html-clean==0.4.2",
+  "PyYAML==6.0.2",
+  "python-dateutil==2.9.0.post0",
+]
+
+[tool.uv]
+package = false

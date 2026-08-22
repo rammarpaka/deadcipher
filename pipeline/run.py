@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -72,7 +73,32 @@ def main() -> int:
             f"[{item.feed_id}] {preview} | scrape={item.scrape_status} chars={len(item.scraped_text)}"
         )
     print(f"Wrote {args.output}")
+    _write_github_summary(report)
     return 0 if not failures else 0
+
+
+def _write_github_summary(report: dict) -> None:
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+    lines = [
+        "## RSS ingest log",
+        f"- Ran at: `{report['ran_at']}`",
+        f"- Feeds: {report['feeds_configured']}",
+        f"- RSS items: {report['items_from_rss']} unique={report['unique_urls']}",
+        "",
+    ]
+    if report["feed_failures"]:
+        lines.append("### Feed failures")
+        for failure in report["feed_failures"]:
+            lines.append(f"- **{failure['feed_id']}**: {failure['error']}")
+        lines.append("")
+    lines.append("### Newest items")
+    for item in report["items"]:
+        lines.append(
+            f"- [{item['feed_id']}] {item['title']} — scrape=`{item['scrape_status']}`"
+        )
+    Path(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
