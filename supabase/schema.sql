@@ -17,7 +17,8 @@ create table if not exists rss_articles (
     summary text not null default '',
     body text not null default '',
     scrape_status text not null default 'skipped',
-    scraped_at timestamptz not null default now()
+    scraped_at timestamptz not null default now(),
+    synthesized_at timestamptz
 );
 
 create table if not exists cybersecurity_news (

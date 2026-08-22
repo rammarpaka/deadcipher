@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from pipeline.ingest import default_client, ingest_feeds, load_feeds
 from pipeline.scrape import scrape_client, scrape_items
 from pipeline.supabase_export import connect, export_items, is_configured, known_urls
+from pipeline.synthesize import run_synthesis
 
 ROOT = Path(__file__).resolve().parent
 FEEDS_PATH = ROOT / "feeds.yaml"
@@ -20,6 +21,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ingest cybersecurity RSS feeds.")
     parser.add_argument("--max-items", type=int, default=8, help="Cap items to scrape this run.")
     parser.add_argument("--no-scrape", action="store_true", help="Only read RSS, skip article fetch.")
+    parser.add_argument(
+        "--no-synthesize", action="store_true", help="Skip Gemini synthesis step."
+    )
+    parser.add_argument(
+        "--dry-run-synthesis",
+        action="store_true",
+        help="Cluster pending articles and print the plan without calling Gemini.",
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -64,6 +73,10 @@ def main() -> int:
     if db is not None:
         export_stats = export_items(db, selected)
 
+    synthesis_stats: dict = {"skipped": True}
+    if db is not None and not args.no_synthesize:
+        synthesis_stats = run_synthesis(db, dry_run=args.dry_run_synthesis)
+
     report = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "feeds_configured": len(feeds),
@@ -73,6 +86,7 @@ def main() -> int:
         "selected": len(selected),
         "supabase_configured": db is not None,
         "supabase_export": export_stats,
+        "synthesis": synthesis_stats,
         "feed_failures": failures,
         "items": [item.to_dict() for item in selected],
     }
@@ -83,6 +97,7 @@ def main() -> int:
     print(f"Feeds configured: {len(feeds)}")
     print(f"RSS items: {len(items)} unique={len(unique)}")
     print(f"Supabase: configured={db is not None} skipped_known={already_tracked} {export_stats}")
+    print(f"Synthesis: {synthesis_stats}")
     if failures:
         print("Feed failures:")
         for failure in failures:
@@ -107,6 +122,7 @@ def _write_github_summary(report: dict) -> None:
         f"- Feeds: {report['feeds_configured']}",
         f"- RSS items: {report['items_from_rss']} unique={report['unique_urls']}",
         f"- Supabase: configured={report['supabase_configured']} export={report['supabase_export']}",
+        f"- Synthesis: {report['synthesis']}",
         "",
     ]
     if report["feed_failures"]:

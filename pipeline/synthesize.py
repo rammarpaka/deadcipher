@@ -1,0 +1,208 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+from datetime import datetime, timezone
+
+from supabase import Client
+
+MODEL = "gemini-3.6-flash"
+BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+BODY_TRUNCATE = 6000
+SUMMARY_FALLBACK = 2000
+TITLE_JACCARD_THRESHOLD = 0.45
+CLUSTER_WINDOW_DAYS = 7
+MAX_CLUSTERS_PER_RUN = 6
+REQUEST_SPACING_SECONDS = 4.0
+
+CVE_PATTERN = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
+
+SYSTEM_INSTRUCTION = (
+    "You are a cybersecurity news editor. You merge multiple source articles "
+    "about the same event into one original report. You never copy sentences "
+    "verbatim from sources; you always write new prose. You respond with JSON only."
+)
+
+PROMPT_TEMPLATE = """Synthesize an ORIGINAL news report from the source articles below, which all cover the same event or topic.
+
+STRICT RULES:
+1. Write 2-5 short paragraphs of entirely original prose. Never copy any sentence verbatim from the sources.
+2. Every fact must come from the given sources only. Do not add outside knowledge.
+3. Each paragraph must include exactly one "citation_source_url" taken verbatim from that source's "url" field.
+4. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
+5. Respond with ONLY a JSON object, no markdown fences, matching:
+   {{"headline": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
+
+SOURCE ARTICLES:
+{sources}
+"""
+
+
+class Article:
+    def __init__(self, row: dict):
+        self.url = row["url"]
+        self.title = row.get("title") or ""
+        self.summary = row.get("summary") or ""
+        self.body = row.get("body") or ""
+        self.published_at = row.get("published_at")
+        self.scraped_at = row.get("scraped_at")
+        self.cves = set(CVE_PATTERN.findall(f"{self.title} {self.summary}"))
+
+    @property
+    def timestamp(self) -> float:
+        raw = self.published_at or self.scraped_at
+        if not raw:
+            return 0.0
+        try:
+            return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return 0.0
+
+    def source_text(self) -> str:
+        text = self.body.strip() or self.summary.strip() or self.title
+        limit = BODY_TRUNCATE if self.body.strip() else SUMMARY_FALLBACK
+        return text[:limit]
+
+    def to_prompt_block(self) -> str:
+        return f"- url: {self.url}\n  title: {self.title}\n  content:\n{self.source_text()}"
+
+
+def fetch_pending(db: Client, limit: int = 30) -> list[Article]:
+    result = (
+        db.table("rss_articles")
+        .select("*")
+        .is_("synthesized_at", "null")
+        .order("scraped_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return [Article(row) for row in (result.data or [])]
+
+
+def _title_tokens(text: str) -> set[str]:
+    stopwords = {"the", "a", "an", "in", "on", "for", "of", "to", "and", "with", "new"}
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in stopwords}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _same_event(a: Article, b: Article) -> bool:
+    if a.cves and b.cves and a.cves & b.cves:
+        return True
+    if abs(a.timestamp - b.timestamp) > CLUSTER_WINDOW_DAYS * 86400:
+        return False
+    return _jaccard(_title_tokens(a.title), _title_tokens(b.title)) >= TITLE_JACCARD_THRESHOLD
+
+
+def cluster_articles(articles: list[Article]) -> list[list[Article]]:
+    ordered = sorted(articles, key=lambda a: a.timestamp, reverse=True)
+    clusters: list[list[Article]] = []
+    for article in ordered:
+        merged = False
+        for cluster in clusters:
+            if any(_same_event(article, member) for member in cluster):
+                cluster.append(article)
+                merged = True
+                break
+        if not merged:
+            clusters.append([article])
+    return clusters
+
+
+def _llm_config() -> tuple[str, str, str]:
+    return (
+        os.environ.get("LLM_BASE_URL") or BASE_URL,
+        os.environ.get("LLM_MODEL") or MODEL,
+        os.environ["LLM_API_KEY"],
+    )
+
+
+def _is_llm_configured() -> bool:
+    return bool(os.environ.get("LLM_API_KEY"))
+
+
+def _llm_client():
+    from openai import OpenAI
+
+    base_url, _model, api_key = _llm_config()
+    return OpenAI(api_key=api_key, base_url=base_url)
+
+
+def _validate_story(data: object, allowed_urls: set[str]) -> tuple[str, list[dict]] | None:
+    if not isinstance(data, dict):
+        return None
+    headline = str(data.get("headline") or "").strip()
+    paragraphs = data.get("paragraphs")
+    if not headline or not isinstance(paragraphs, list):
+        return None
+    cleaned = []
+    for para in paragraphs:
+        if not isinstance(para, dict):
+            continue
+        text = str(para.get("paragraph_text") or "").strip()
+        url = str(para.get("citation_source_url") or "").strip()
+        if text and url in allowed_urls:
+            cleaned.append({"paragraph_text": text, "citation_source_url": url})
+    if not cleaned:
+        return None
+    return headline, cleaned
+
+
+def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]:
+    sources = "\n\n".join(article.to_prompt_block() for article in cluster)
+    _base_url, model, _api_key = _llm_config()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": PROMPT_TEMPLATE.format(sources=sources)},
+        ],
+        response_format={"type": "json_object"},
+    )
+    story = _validate_story(json.loads(response.choices[0].message.content), {a.url for a in cluster})
+    if story is None:
+        raise ValueError("model returned invalid story structure")
+    return story
+
+
+def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int = MAX_CLUSTERS_PER_RUN) -> dict:
+    stats = {"pending": 0, "clusters": 0, "published": 0, "failed": 0}
+    pending = fetch_pending(db)
+    stats["pending"] = len(pending)
+    if not pending:
+        return stats
+
+    clusters = [c for c in cluster_articles(pending)][:max_clusters]
+    stats["clusters"] = len(clusters)
+
+    if dry_run:
+        return stats
+
+    if not _is_llm_configured():
+        stats["failed"] = len(clusters)
+        stats["error"] = "LLM_API_KEY not set"
+        return stats
+
+    llm = _llm_client()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for cluster in clusters:
+        try:
+            headline, paragraphs = synthesize_cluster(llm, cluster)
+            db.table("cybersecurity_news").insert(
+                {"headline": headline, "story_body": paragraphs}
+            ).execute()
+            db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
+                "url", [a.url for a in cluster]
+            ).execute()
+            stats["published"] += 1
+        except Exception as exc:  # noqa: BLE001 — keep synthesizing remaining clusters
+            stats["failed"] += 1
+            print(f"[synthesize] failed ({len(cluster)} sources): {exc}")
+        time.sleep(REQUEST_SPACING_SECONDS)
+    return stats

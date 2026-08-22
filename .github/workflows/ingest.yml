@@ -24,6 +24,9 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,5 +38,5 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Ingest RSS feeds (dedupe + export to Supabase)
-        run: uv run python -m pipeline --no-scrape --max-items 12 --output artifacts/ingest.json
+      - name: Ingest RSS feeds (dedupe + scrape + export to Supabase)
+        run: uv run python -m pipeline --max-items 12 --output artifacts/ingest.json
