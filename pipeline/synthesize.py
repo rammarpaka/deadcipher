@@ -19,6 +19,13 @@ REQUEST_SPACING_SECONDS = 4.0
 
 CVE_PATTERN = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
 
+
+def _max_clusters_default() -> int:
+    try:
+        return max(1, int(os.environ.get("SYNTHESIS_MAX_CLUSTERS") or ""))
+    except ValueError:
+        return MAX_CLUSTERS_PER_RUN
+
 SYSTEM_INSTRUCTION = (
     "You are a cybersecurity news editor. You merge multiple source articles "
     "about the same event into one original report. You never copy sentences "
@@ -206,8 +213,9 @@ def _is_quota_error(exc: Exception) -> bool:
     return "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower()
 
 
-def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int = MAX_CLUSTERS_PER_RUN) -> dict:
+def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = None) -> dict:
     stats: dict = {"pending": 0, "clusters": 0, "published": 0, "failed": 0, "errors": []}
+    max_clusters = max_clusters or _max_clusters_default()
     pending = fetch_pending(db)
     stats["pending"] = len(pending)
     if not pending:
