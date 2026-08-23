@@ -109,7 +109,12 @@ def main() -> int:
     print(f"Feeds configured: {len(feeds)}")
     print(f"RSS items: {len(items)} unique={len(unique)}")
     print(f"Supabase: configured={db is not None} skipped_known={already_tracked} {export_stats}")
-    print(f"Synthesis: {synthesis_stats}")
+    print(f"Synthesis: { {k: v for k, v in synthesis_stats.items() if k != 'errors'} }")
+    if synthesis_stats.get("failed"):
+        for error in synthesis_stats.get("errors", []):
+            print(f"::warning::[synthesize] {error}")
+    if synthesis_stats.get("quota_exhausted"):
+        print("::warning::LLM daily quota exhausted — synthesis resumes on the next run")
     if failures:
         print("Feed failures:")
         for failure in failures:
@@ -121,7 +126,7 @@ def main() -> int:
         )
     print(f"Wrote {args.output}")
     _write_github_summary(report)
-    return 0 if not failures else 0
+    return 0
 
 
 def _write_github_summary(report: dict) -> None:
@@ -134,9 +139,14 @@ def _write_github_summary(report: dict) -> None:
         f"- Feeds: {report['feeds_configured']}",
         f"- RSS items: {report['items_from_rss']} unique={report['unique_urls']}",
         f"- Supabase: configured={report['supabase_configured']} export={report['supabase_export']}",
-        f"- Synthesis: {report['synthesis']}",
+        f"- Synthesis: { {k: v for k, v in report['synthesis'].items() if k != 'errors'} }",
         "",
     ]
+    if report["synthesis"].get("failed"):
+        lines.append("### Synthesis failures")
+        for error in report["synthesis"].get("errors", []):
+            lines.append(f"- ⚠️ {error}")
+        lines.append("")
     if report["feed_failures"]:
         lines.append("### Feed failures")
         for failure in report["feed_failures"]:

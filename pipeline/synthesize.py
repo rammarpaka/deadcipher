@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from supabase import Client
 
-MODEL = "gemini-3.6-flash"
+MODEL = "gemini-3.5-flash-lite"
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 BODY_TRUNCATE = 6000
 SUMMARY_FALLBACK = 2000
@@ -159,6 +159,18 @@ def _validate_story(data: object, allowed_urls: set[str]) -> tuple[str, list[dic
     return headline, cleaned
 
 
+def _parse_json(text: str):
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`").strip()
+        if cleaned[:4].lower() == "json":
+            cleaned = cleaned[4:].strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r",\s*([}\]])", r"\1", cleaned))
+
+
 def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> tuple[str, list[dict]]:
     response = client.chat.completions.create(
         model=model,
@@ -168,7 +180,7 @@ def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> tuple[s
         ],
         response_format={"type": "json_object"},
     )
-    story = _validate_story(json.loads(response.choices[0].message.content), allowed_urls)
+    story = _validate_story(_parse_json(response.choices[0].message.content), allowed_urls)
     if story is None:
         raise ValueError("model returned invalid story structure")
     return story
@@ -182,12 +194,20 @@ def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]
     story = _attempt(client, model, prompt, allowed_urls)
     single_cited = len(cluster) > 1 and len({p["citation_source_url"] for p in story[1]}) == 1
     if single_cited:
-        story = _attempt(client, model, prompt + DIVERSITY_NUDGE, allowed_urls)
+        try:
+            story = _attempt(client, model, prompt + DIVERSITY_NUDGE, allowed_urls)
+        except Exception:  # noqa: BLE001 — first draft is valid; keep it rather than fail
+            pass
     return story
 
 
+def _is_quota_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower()
+
+
 def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int = MAX_CLUSTERS_PER_RUN) -> dict:
-    stats = {"pending": 0, "clusters": 0, "published": 0, "failed": 0}
+    stats: dict = {"pending": 0, "clusters": 0, "published": 0, "failed": 0, "errors": []}
     pending = fetch_pending(db)
     stats["pending"] = len(pending)
     if not pending:
@@ -218,6 +238,11 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int = MAX_CLU
             stats["published"] += 1
         except Exception as exc:  # noqa: BLE001 — keep synthesizing remaining clusters
             stats["failed"] += 1
-            print(f"[synthesize] failed ({len(cluster)} sources): {exc}")
+            message = f"{len(cluster)} source(s): {str(exc)[:200]}"
+            stats["errors"].append(message)
+            print(f"[synthesize] failed ({message})")
+            if _is_quota_error(exc):
+                stats["quota_exhausted"] = True
+                break
         time.sleep(REQUEST_SPACING_SECONDS)
     return stats
