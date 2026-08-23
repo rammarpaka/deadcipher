@@ -25,6 +25,7 @@ create table if not exists cybersecurity_news (
     id bigint generated always as identity primary key,
     headline text not null,
     story_body jsonb not null,
+    published_at timestamptz,
     created_at timestamptz not null default now()
 );
 

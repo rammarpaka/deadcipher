@@ -13,7 +13,7 @@ from dateutil import parser as date_parser
 from pipeline.models import FeedItem
 
 USER_AGENT = (
-    "DeadcipherBot/0.1 (+https://github.com/deadcipher; cybersecurity news aggregator)"
+    "RSS aggregator"
 )
 TRACKING_PARAMS = {
     "utm_source",

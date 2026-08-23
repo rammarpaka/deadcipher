@@ -18,6 +18,7 @@ MAX_CLUSTERS_PER_RUN = 6
 REQUEST_SPACING_SECONDS = 4.0
 
 CVE_PATTERN = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
+MIN_PARAGRAPHS = 3
 
 
 def _max_clusters_default() -> int:
@@ -35,12 +36,13 @@ SYSTEM_INSTRUCTION = (
 PROMPT_TEMPLATE = """Synthesize an ORIGINAL news report from the source articles below, which all cover the same event or topic.
 
 STRICT RULES:
-1. Write 2-6 short paragraphs of entirely original prose. Never copy any sentence verbatim from the sources.
-2. Every fact must come from the given sources only. Do not add outside knowledge.
-3. Each paragraph must include exactly one "citation_source_url" taken verbatim from that source's "url" field.
-4. Spread the reporting across sources: consecutive paragraphs must cite DIFFERENT urls, and every provided source url must be cited at least once.
-5. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
-6. Respond with ONLY a JSON object, no markdown fences, matching:
+1. Write 3-5 short paragraphs of entirely original prose. NEVER fewer than 3 paragraphs. Never copy any sentence verbatim from the sources.
+2. Structure: paragraph 1 = what happened; middle paragraphs = technical details, impact, and affected parties; final paragraph = context, history, or what happens next.
+3. Every fact must come from the given sources only. Use ALL of the provided material — background, timelines, quotes paraphrased in your own words — to reach 3+ substantial paragraphs without inventing anything.
+4. Each paragraph must include exactly one "citation_source_url" taken verbatim from that source's "url" field.
+5. Spread the reporting across sources: consecutive paragraphs must cite DIFFERENT urls, and every provided source url must be cited at least once.
+6. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
+7. Respond with ONLY a JSON object, no markdown fences, matching:
    {{"headline": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
 
 SOURCE ARTICLES:
@@ -50,6 +52,10 @@ SOURCE ARTICLES:
 DIVERSITY_NUDGE = """
 
 MANDATORY CORRECTION: Your previous draft drew all citations from a single source. Rewrite it so each paragraph reports details from a DIFFERENT source url and every provided source url appears as a citation at least once."""
+
+LENGTH_NUDGE = """
+
+MANDATORY CORRECTION: Your previous draft had fewer than 3 paragraphs, which violates rule 1. Rewrite it with at least 3 paragraphs following the structure in rule 2 (what happened / technical detail and impact / context or outlook), expanding only with facts present in the source material."""
 
 
 class Article:
@@ -71,6 +77,19 @@ class Article:
             return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).timestamp()
         except ValueError:
             return 0.0
+
+    def published_iso(self) -> str | None:
+        raw = self.published_at
+        if not raw:
+            return None
+        try:
+            return (
+                datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                .astimezone(timezone.utc)
+                .isoformat()
+            )
+        except ValueError:
+            return None
 
     def source_text(self) -> str:
         text = self.body.strip() or self.summary.strip() or self.title
@@ -199,6 +218,11 @@ def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]
     _base_url, model, _api_key = _llm_config()
     prompt = PROMPT_TEMPLATE.format(sources=sources)
     story = _attempt(client, model, prompt, allowed_urls)
+    if len(story[1]) < MIN_PARAGRAPHS:
+        try:
+            story = _attempt(client, model, prompt + LENGTH_NUDGE, allowed_urls)
+        except Exception:  # noqa: BLE001 — keep the shorter valid draft
+            pass
     single_cited = len(cluster) > 1 and len({p["citation_source_url"] for p in story[1]}) == 1
     if single_cited:
         try:
@@ -237,9 +261,11 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
     for cluster in clusters:
         try:
             headline, paragraphs = synthesize_cluster(llm, cluster)
-            db.table("cybersecurity_news").insert(
-                {"headline": headline, "story_body": paragraphs}
-            ).execute()
+            dates = [iso for a in cluster if (iso := a.published_iso())]
+            payload = {"headline": headline, "story_body": paragraphs}
+            if dates:
+                payload["published_at"] = max(dates)
+            db.table("cybersecurity_news").insert(payload).execute()
             db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
                 "url", [a.url for a in cluster]
             ).execute()
