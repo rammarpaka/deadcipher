@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import Logo from "@/components/Logo";
 
 export default function SiteHeader() {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -18,19 +18,24 @@ export default function SiteHeader() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const navLink =
+    "text-[11px] font-semibold uppercase tracking-[0.14em] text-muted transition-colors hover:text-fg";
+
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-[11px] font-bold text-white">
-            dc
-          </span>
-          <span className="font-semibold tracking-tight text-fg">
-            deadcipher
-          </span>
-        </Link>
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+        <Logo />
 
-        <form action="/search" className="relative ml-auto w-full max-w-md">
+        <nav className="hidden items-center gap-5 md:flex">
+          <a href="/" className={navLink}>
+            Feed
+          </a>
+          <a href="/#trending-cves" className={navLink}>
+            Trending CVEs
+          </a>
+        </nav>
+
+        <form action="/search" className="relative ml-auto w-full max-w-sm">
           <svg
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
             width="14"
@@ -57,7 +62,16 @@ export default function SiteHeader() {
           </kbd>
         </form>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <span className="hidden items-center gap-1.5 sm:inline-flex">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-rose-500" />
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-rose-500">
+              Live
+            </span>
+          </span>
           <ThemeToggle />
         </div>
       </div>

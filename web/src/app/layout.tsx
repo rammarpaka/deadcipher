@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,9 +15,13 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "deadcipher — cybersecurity news, explained by evidence",
+  title: "deadcipher — cybersecurity intelligence, without the noise",
   description:
     "AI-synthesized cybersecurity reporting with paragraph-level citations. Every claim traceable to its source, refreshed automatically.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
 };
 
 const themeBootstrap = `(function(){try{var t=localStorage.getItem("dc-theme");var d=t?t==="dark":true;document.documentElement.classList.toggle("dark",d)}catch(e){document.documentElement.classList.add("dark")}})()`;

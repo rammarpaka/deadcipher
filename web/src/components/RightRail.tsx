@@ -3,16 +3,32 @@ import { sourceDomain } from "@/lib/supabase";
 
 function Widget({
   title,
+  id,
+  action,
   children,
 }: {
   title: string;
+  id?: string;
+  action?: { label: string; href: string };
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-5">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-faint">
-        {title}
-      </h3>
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-surface p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
+          {title}
+        </h3>
+        {action && (
+          <a
+            href={action.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-semibold uppercase tracking-widest text-sky-500 hover:underline"
+          >
+            {action.label}
+          </a>
+        )}
+      </div>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -68,7 +84,11 @@ export default function RightRail({ stories }: { stories: Story[] }) {
   return (
     <aside className="space-y-5">
       {cves.length > 0 && (
-        <Widget title="Trending vulnerabilities">
+        <Widget
+          title="Trending vulnerabilities"
+          id="trending-cves"
+          action={{ label: "NVD", href: "https://nvd.nist.gov" }}
+        >
           <ul className="space-y-2">
             {cves.map(([cve, info]) => (
               <li key={cve}>

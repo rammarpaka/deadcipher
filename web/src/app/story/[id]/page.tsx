@@ -12,6 +12,21 @@ import {
   type Citation,
 } from "@/lib/supabase";
 
+function CitationFavicon({ domain }: { domain: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+      alt=""
+      width={14}
+      height={14}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      className="rounded-[3px]"
+    />
+  );
+}
+
 export const revalidate = 60;
 
 type Props = { params: Promise<{ id: string }> };
@@ -56,11 +71,8 @@ export default async function StoryPage({ params }: Props) {
   return (
     <SiteShell>
       <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10">
-        <div className="flex items-center gap-2 text-xs text-faint">
-          <time
-            dateTime={storyDate(story)}
-            className="font-mono"
-          >
+        <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+          <time dateTime={storyDate(story)} className="font-mono">
             {new Date(storyDate(story)).toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
@@ -101,8 +113,9 @@ export default async function StoryPage({ params }: Props) {
                 target="_blank"
                 rel="noopener noreferrer"
                 title={para.citation_source_url}
-                className="inline-flex translate-y-px items-center rounded-full border border-line bg-surface2 px-2 py-0.5 font-mono text-[11px] font-medium text-muted no-underline transition-colors hover:border-sky-500/60 hover:text-sky-500"
+                className="inline-flex translate-y-px items-center gap-1.5 rounded-full border border-line bg-surface2 px-2 py-0.5 text-[11px] font-medium text-muted no-underline transition-colors hover:border-sky-500/60 hover:text-sky-500"
               >
+                <CitationFavicon domain={sourceDomain(para.citation_source_url)} />
                 [{numbers.get(para.citation_source_url)}]{" "}
                 {sourceDomain(para.citation_source_url)}
               </a>

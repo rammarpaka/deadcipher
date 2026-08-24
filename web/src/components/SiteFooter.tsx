@@ -1,3 +1,5 @@
+import Logo from "@/components/Logo";
+
 const FEATURES = [
   {
     title: "Real-time updates",
@@ -54,12 +56,9 @@ export default function SiteFooter() {
             </div>
           ))}
         </div>
-        <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-line pt-6 text-xs text-faint sm:flex-row">
-          <span>© {new Date().getFullYear()} deadcipher</span>
-          <span>
-            Original syntheses from public RSS sources with paragraph-level
-            attribution.
-          </span>
+        <div className="mt-8 flex items-center justify-between border-t border-line pt-6 text-xs text-faint">
+          <Logo size={20} />
+          <span>&copy; {new Date().getFullYear()} deadcipher</span>
         </div>
       </div>
     </footer>

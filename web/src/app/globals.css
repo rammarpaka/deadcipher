@@ -3,13 +3,13 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fafafa;
+  --background: #f7f7f8;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
+  --surface-2: #f0f0f2;
   --fg: #18181b;
   --muted: #52525b;
   --faint: #a1a1aa;
-  --line: #e4e4e7;
+  --line: #e6e6ea;
 }
 
 .dark {
@@ -38,6 +38,12 @@ html {
   color-scheme: light;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 html.dark {
   color-scheme: dark;
 }
@@ -50,4 +56,9 @@ body {
 
 ::selection {
   background: rgb(56 189 248 / 0.25);
+}
+
+.dot-grid {
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 22px 22px;
 }
