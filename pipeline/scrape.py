@@ -3,6 +3,7 @@ from __future__ import annotations
 import trafilatura
 from httpx import Client, HTTPError
 
+from pipeline.images import extract_og_image, is_configured, process_image
 from pipeline.ingest import USER_AGENT
 from pipeline.models import FeedItem
 
@@ -30,6 +31,12 @@ def scrape_item(item: FeedItem, client: Client) -> FeedItem:
 
     item.scraped_text = text.strip()
     item.scrape_status = "ok"
+
+    og_image = extract_og_image(response.text, str(response.url))
+    if og_image and is_configured():
+        key = process_image(og_image, str(response.url), client)
+        if key:
+            item.image_path = key
     return item
 
 

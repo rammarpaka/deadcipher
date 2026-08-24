@@ -64,6 +64,7 @@ class Article:
         self.title = row.get("title") or ""
         self.summary = row.get("summary") or ""
         self.body = row.get("body") or ""
+        self.image_path = row.get("image_path") or ""
         self.published_at = row.get("published_at")
         self.scraped_at = row.get("scraped_at")
         self.cves = set(CVE_PATTERN.findall(f"{self.title} {self.summary}"))
@@ -265,6 +266,9 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
             payload = {"headline": headline, "story_body": paragraphs}
             if dates:
                 payload["published_at"] = max(dates)
+            image = next((a.image_path for a in cluster if a.image_path), "")
+            if image:
+                payload["image_path"] = image
             db.table("cybersecurity_news").insert(payload).execute()
             db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
                 "url", [a.url for a in cluster]

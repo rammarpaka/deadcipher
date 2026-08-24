@@ -1,4 +1,4 @@
-export type Citation = {
+﻿export type Citation = {
   paragraph_text: string;
   citation_source_url: string;
 };
@@ -7,9 +7,17 @@ export type Story = {
   id: number;
   headline: string;
   story_body: Citation[];
+  image_path: string | null;
   published_at: string | null;
   created_at: string;
 };
+
+export const IMAGE_CDN = process.env.NEXT_PUBLIC_IMAGE_CDN ?? "";
+
+export function imageUrl(path: string | null | undefined): string | null {
+  if (!path || !IMAGE_CDN) return null;
+  return `${IMAGE_CDN.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+}
 
 export async function searchStories(q: string, limit = 20): Promise<Story[]> {
   const term = q.replace(/[%,()]/g, " ").trim();
@@ -18,7 +26,7 @@ export async function searchStories(q: string, limit = 20): Promise<Story[]> {
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
   url.searchParams.set(
     "select",
-    "id,headline,story_body,published_at,created_at",
+    "id,headline,story_body,image_path,published_at,created_at",
   );
   url.searchParams.set("headline", `ilike.*${term}*`);
   url.searchParams.set("order", "published_at.desc.nullslast");
@@ -70,7 +78,7 @@ async function queryStories(limit: number, id?: number): Promise<Story[]> {
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
   url.searchParams.set(
     "select",
-    "id,headline,story_body,published_at,created_at",
+    "id,headline,story_body,image_path,published_at,created_at",
   );
   if (id !== undefined) {
     url.searchParams.set("id", `eq.${id}`);

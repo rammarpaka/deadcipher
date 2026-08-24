@@ -1,9 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SiteShell from "@/components/SiteShell";
 import {
   getStory,
+  imageUrl,
   sourceDomain,
   storyDate,
   timeAgo,
@@ -21,6 +23,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: story ? `${story.headline} — deadcipher` : "Story not found",
     description:
       story?.story_body[0]?.paragraph_text.slice(0, 150) ?? undefined,
+    openGraph: story
+      ? {
+          title: story.headline,
+          images: imageUrl(story.image_path)
+            ? [imageUrl(story.image_path)!]
+            : undefined,
+        }
+      : undefined,
   };
 }
 
@@ -68,6 +78,19 @@ export default async function StoryPage({ params }: Props) {
         <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-fg sm:text-4xl">
           {story.headline}
         </h1>
+
+        {imageUrl(story.image_path) && (
+          <div className="relative mt-6 aspect-[16/8] w-full overflow-hidden rounded-2xl border border-line bg-surface2">
+            <Image
+              src={imageUrl(story.image_path)!}
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="object-cover"
+            />
+          </div>
+        )}
 
         <article className="mt-8 space-y-6">
           {paragraphs.map((para, i) => (

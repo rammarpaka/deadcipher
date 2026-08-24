@@ -15,6 +15,7 @@ class FeedItem:
     summary: str
     scraped_text: str = ""
     scrape_status: str = "skipped"
+    image_path: str = ""
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

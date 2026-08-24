@@ -43,6 +43,7 @@ def export_items(client: Client, items: list[FeedItem]) -> dict[str, int]:
                 "summary": item.summary,
                 "body": item.scraped_text,
                 "scrape_status": item.scrape_status,
+                "image_path": item.image_path,
             }
         ).execute()
         client.table("tracked_rss_links").insert(

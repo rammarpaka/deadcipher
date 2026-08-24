@@ -44,7 +44,10 @@ export default async function Home() {
     error = e instanceof Error ? e.message : "Failed to load stories";
   }
 
-  const [featured, ...rest] = stories;
+  const withImage = stories.findIndex((s) => s.image_path);
+  const featuredIdx = withImage !== -1 && withImage < 5 ? withImage : 0;
+  const featured = stories[featuredIdx];
+  const rest = stories.filter((_, i) => i !== featuredIdx);
 
   return (
     <SiteShell>
