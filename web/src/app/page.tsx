@@ -1,28 +1,28 @@
-import Link from "next/link";
-
+import SiteShell from "@/components/SiteShell";
 import StoryCard from "@/components/StoryCard";
+import RightRail from "@/components/RightRail";
 import { getStories, timeAgo, type Story } from "@/lib/supabase";
 
 export const revalidate = 60;
 
 function StatsBar({ stories }: { stories: Story[] }) {
   const sourceCount = new Set(
-    stories.flatMap((s) =>
-      s.story_body.map((p) => p.citation_source_url),
-    ),
+    stories.flatMap((s) => s.story_body.map((p) => p.citation_source_url)),
   ).size;
-  const latest = stories[0]?.created_at;
+  const latest = stories[0]?.published_at ?? stories[0]?.created_at;
 
   return (
-    <div className="mt-6 flex flex-wrap gap-2 text-xs text-zinc-400">
-      <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1">
-        <strong className="text-zinc-200">{stories.length}</strong> stories
+    <div className="mt-6 flex flex-wrap gap-2 text-xs text-muted">
+      <span className="rounded-full border border-line bg-surface px-3 py-1.5">
+        <strong className="font-semibold text-fg">{stories.length}</strong>{" "}
+        active stories
       </span>
-      <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1">
-        <strong className="text-zinc-200">{sourceCount}</strong> sources cited
+      <span className="rounded-full border border-line bg-surface px-3 py-1.5">
+        <strong className="font-semibold text-fg">{sourceCount}</strong>{" "}
+        sources analyzed
       </span>
       {latest && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1">
+        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -47,67 +47,55 @@ export default async function Home() {
   const [featured, ...rest] = stories;
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-[11px] font-bold text-white">
-              dc
-            </span>
-            <span className="font-semibold tracking-tight text-zinc-100">
-              deadcipher
-            </span>
-          </Link>
-          <span className="text-xs text-zinc-500">
-            synthesized · cited · automated
-          </span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-4 pb-20 pt-10">
-        <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+    <SiteShell>
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-12">
+        <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
+          Live threat intelligence
+        </p>
+        <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-tight tracking-tight text-fg sm:text-5xl">
           Cybersecurity news,{" "}
           <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-            synthesized and cited.
+            explained by evidence.
           </span>
         </h1>
-        <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
-          Breaking stories merged from across the security web into original
-          reports — every paragraph linked to the article it came from. No
-          clickbait, no repetition.
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
+          AI-synthesized reporting from across the security web. Every claim is
+          traceable to its source, stripped of duplication, and prioritized by
+          recency.
         </p>
 
         {!error && stories.length > 0 && <StatsBar stories={stories} />}
 
         {error && (
-          <div className="mt-8 rounded-xl border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-300">
+          <div className="mt-8 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-500">
             Failed to load stories: {error}
           </div>
         )}
 
         {!error && stories.length === 0 && (
-          <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-400">
+          <div className="mt-8 rounded-xl border border-line bg-surface p-6 text-sm text-muted">
             No stories yet — the pipeline is working on its first batch. Check
             back in a few minutes.
           </div>
         )}
 
         {!error && featured && (
-          <section className="mt-10 space-y-5">
-            <StoryCard story={featured} featured />
-            <div className="space-y-5">
-              {rest.map((story) => (
-                <StoryCard key={story.id} story={story} />
-              ))}
+          <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div>
+              <StoryCard story={featured} featured />
+              <p className="mt-10 text-xs font-semibold uppercase tracking-widest text-faint">
+                Latest intelligence
+              </p>
+              <div className="mt-4 space-y-5">
+                {rest.map((story) => (
+                  <StoryCard key={story.id} story={story} />
+                ))}
+              </div>
             </div>
-          </section>
+            <RightRail stories={stories} />
+          </div>
         )}
       </main>
-
-      <footer className="border-t border-zinc-800/80 py-6 text-center text-xs text-zinc-600">
-        Original syntheses generated from public RSS sources with
-        paragraph-level attribution.
-      </footer>
-    </div>
+    </SiteShell>
   );
 }

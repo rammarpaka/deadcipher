@@ -14,21 +14,21 @@ export default function StoryCard({
   );
   const sources = [...new Set(paragraphs.map((p) => p.citation_source_url))];
   const firstText = paragraphs[0]?.paragraph_text ?? "";
-  const excerpt = firstText.slice(0, featured ? 320 : 220);
+  const excerpt = firstText.slice(0, featured ? 340 : 220);
 
   return (
     <Link
       href={`/story/${story.id}`}
-      className={`group block rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 transition-all hover:border-sky-800 hover:bg-zinc-900 ${
-        featured ? "ring-1 ring-sky-900/60" : ""
+      className={`group block rounded-2xl border border-line bg-surface p-6 transition-all hover:border-sky-500/50 hover:bg-surface2 ${
+        featured ? "ring-1 ring-sky-500/30" : ""
       }`}
     >
-      {featured && (
-        <span className="mb-3 inline-block rounded-full bg-sky-950 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-sky-400">
-          Latest
-        </span>
-      )}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
+      <div className="flex items-center gap-2 text-xs text-faint">
+        {featured && (
+          <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-sky-500">
+            Latest
+          </span>
+        )}
         <time dateTime={storyDate(story)}>{timeAgo(storyDate(story))}</time>
         <span aria-hidden>&middot;</span>
         <span>
@@ -37,23 +37,23 @@ export default function StoryCard({
       </div>
 
       <h2
-        className={`mt-2 font-semibold leading-snug text-zinc-100 transition-colors group-hover:text-white ${
+        className={`mt-2.5 font-semibold leading-snug tracking-tight text-fg transition-colors group-hover:text-sky-500 ${
           featured ? "text-2xl" : "text-lg"
         }`}
       >
         {story.headline}
       </h2>
 
-      <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+      <p className="mt-3 text-sm leading-relaxed text-muted">
         {excerpt}
-        {firstText.length > excerpt.length ? "&hellip;" : ""}
+        {firstText.length > excerpt.length ? <>&hellip;</> : null}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
         {sources.slice(0, 4).map((url, i) => (
           <span
             key={url}
-            className="rounded-full border border-zinc-700/80 bg-zinc-800/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400"
+            className="rounded-full border border-line bg-surface2 px-2 py-0.5 font-mono text-[11px] text-muted"
           >
             [{i + 1}] {sourceDomain(url)}
           </span>

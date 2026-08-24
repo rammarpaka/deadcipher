@@ -11,6 +11,32 @@ export type Story = {
   created_at: string;
 };
 
+export async function searchStories(q: string, limit = 20): Promise<Story[]> {
+  const term = q.replace(/[%,()]/g, " ").trim();
+  if (!term) return [];
+  const { base, headers } = restConfig();
+  const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
+  url.searchParams.set(
+    "select",
+    "id,headline,story_body,published_at,created_at",
+  );
+  url.searchParams.set("headline", `ilike.*${term}*`);
+  url.searchParams.set("order", "published_at.desc.nullslast");
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    throw new Error(`Supabase REST error ${res.status}: ${await res.text()}`);
+  }
+  const rows: Story[] = await res.json();
+  return rows.filter(
+    (story) =>
+      typeof story.headline === "string" &&
+      Array.isArray(story.story_body) &&
+      story.story_body.length > 0,
+  );
+}
+
 export function storyDate(story: Story): string {
   return story.published_at ?? story.created_at;
 }

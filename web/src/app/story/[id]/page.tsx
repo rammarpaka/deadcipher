@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import SiteShell from "@/components/SiteShell";
 import {
   getStory,
   sourceDomain,
@@ -43,60 +44,41 @@ export default async function StoryPage({ params }: Props) {
   const sources = [...numbers.entries()].sort((a, b) => a[1] - b[1]);
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-[11px] font-bold text-white">
-              dc
-            </span>
-            <span className="font-semibold tracking-tight text-zinc-100">
-              deadcipher
-            </span>
-          </Link>
-          <Link
-            href="/"
-            className="text-xs font-medium text-zinc-400 transition-colors hover:text-sky-400"
+    <SiteShell>
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-10">
+        <div className="flex items-center gap-2 text-xs text-faint">
+          <time
+            dateTime={storyDate(story)}
+            className="font-mono"
           >
-            ← All stories
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-4 pb-20 pt-10">
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <time dateTime={storyDate(story)}>
             {new Date(storyDate(story)).toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
               year: "numeric",
             })}
           </time>
-          <span aria-hidden>·</span>
+          <span aria-hidden>&middot;</span>
           <span>{timeAgo(storyDate(story))}</span>
-          <span aria-hidden>·</span>
+          <span aria-hidden>&middot;</span>
           <span>
             {sources.length} source{sources.length > 1 ? "s" : ""}
           </span>
         </div>
 
-        <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
+        <h1 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-fg sm:text-4xl">
           {story.headline}
         </h1>
 
         <article className="mt-8 space-y-6">
           {paragraphs.map((para, i) => (
-            <p
-              key={i}
-              className="text-[15px] leading-7 text-zinc-300"
-            >
+            <p key={i} className="text-[15px] leading-7 text-muted">
               {para.paragraph_text}{" "}
               <a
                 href={para.citation_source_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 title={para.citation_source_url}
-                className="inline-flex translate-y-px items-center rounded-full border border-zinc-700 bg-zinc-800/80 px-2 py-0.5 text-[11px] font-medium text-zinc-300 no-underline transition-colors hover:border-sky-600 hover:text-sky-400"
+                className="inline-flex translate-y-px items-center rounded-full border border-line bg-surface2 px-2 py-0.5 font-mono text-[11px] font-medium text-muted no-underline transition-colors hover:border-sky-500/60 hover:text-sky-500"
               >
                 [{numbers.get(para.citation_source_url)}]{" "}
                 {sourceDomain(para.citation_source_url)}
@@ -105,12 +87,19 @@ export default async function StoryPage({ params }: Props) {
           ))}
         </article>
 
-        <p className="mt-10 border-t border-zinc-800/80 pt-6 text-xs leading-relaxed text-zinc-600">
+        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-faint">
           This report is an original synthesis generated from the public
           sources cited inline above. Sentences are rewritten, not copied; each
           citation links back to the article its facts came from.
         </p>
+
+        <Link
+          href="/"
+          className="mt-8 inline-flex items-center gap-1.5 text-sm font-medium text-sky-500 hover:underline"
+        >
+          &larr; All stories
+        </Link>
       </main>
-    </div>
+    </SiteShell>
   );
 }
