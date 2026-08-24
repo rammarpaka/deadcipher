@@ -12,11 +12,19 @@ export type Story = {
   created_at: string;
 };
 
-export const IMAGE_CDN = process.env.NEXT_PUBLIC_IMAGE_CDN ?? "";
+export function cdnBase(): string {
+  const base = (process.env.NEXT_PUBLIC_IMAGE_CDN ?? "").trim();
+  if (!base) return "";
+  return `${/^https?:\/\//i.test(base) ? base : `https://${base}`}`.replace(
+    /\/$/,
+    "",
+  );
+}
 
 export function imageUrl(path: string | null | undefined): string | null {
-  if (!path || !IMAGE_CDN) return null;
-  return `${IMAGE_CDN.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const base = cdnBase();
+  if (!path || !base) return null;
+  return `${base}/${path.replace(/^\//, "")}`;
 }
 
 export async function searchStories(q: string, limit = 20): Promise<Story[]> {
