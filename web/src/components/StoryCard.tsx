@@ -58,12 +58,9 @@ export default function StoryCard({
           <Favicon key={url} domain={sourceDomain(url)} />
         ))}
       </span>
-      <Link
-        href={`/story/${story.id}`}
-        className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-sky-500 opacity-0 transition-opacity group-hover:opacity-100"
-      >
+      <span className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-sky-500 opacity-0 transition-opacity group-hover:opacity-100">
         Read analysis &rarr;
-      </Link>
+      </span>
     </div>
   );
 

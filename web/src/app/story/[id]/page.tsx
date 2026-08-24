@@ -125,7 +125,7 @@ export default async function StoryPage({ params }: Props) {
 
         <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-faint">
           This report is an original synthesis generated from the public
-          sources cited inline above. Sentences are rewritten, not copied; each
+          sources cited inline above. Sentences are rewritten, not copied each
           citation links back to the article its facts came from.
         </p>
 

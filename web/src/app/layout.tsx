@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -34,7 +35,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+        <Script id="dc-theme" strategy="beforeInteractive">
+          {themeBootstrap}
+        </Script>
       </head>
       <body className="flex min-h-full flex-col bg-background font-sans text-fg">
         {children}

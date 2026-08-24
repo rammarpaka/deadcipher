@@ -6,7 +6,6 @@ import Logo from "@/components/Logo";
 
 export default function SiteHeader() {
   const searchRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -23,19 +22,10 @@ export default function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
         <Logo />
 
-        <nav className="hidden items-center gap-5 md:flex">
-          <a href="/" className={navLink}>
-            Feed
-          </a>
-          <a href="/#trending-cves" className={navLink}>
-            Trending CVEs
-          </a>
-        </nav>
-
-        <form action="/search" className="relative ml-auto w-full max-w-sm">
+        <form action="/search" className="relative mx-auto w-full max-w-md">
           <svg
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
             width="14"
@@ -62,7 +52,7 @@ export default function SiteHeader() {
           </kbd>
         </form>
 
-        <div className="ml-auto flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <span className="hidden items-center gap-1.5 sm:inline-flex">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75" />
