@@ -1,6 +1,7 @@
 -- Run this in the Supabase SQL editor once.
 -- Service role (GitHub Action / local pipeline) bypasses RLS.
--- The Next.js app should use the anon key with SELECT-only policies later.
+-- The Next.js app uses the publishable key with SELECT-only policy on
+-- cybersecurity_news (see the policy at the bottom).
 
 create table if not exists tracked_rss_links (
     url text primary key,
@@ -18,17 +19,56 @@ create table if not exists rss_articles (
     body text not null default '',
     scrape_status text not null default 'skipped',
     scraped_at timestamptz not null default now(),
-    synthesized_at timestamptz
+    synthesized_at timestamptz,
+    image_path text
 );
 
 create table if not exists cybersecurity_news (
     id bigint generated always as identity primary key,
     headline text not null,
     story_body jsonb not null,
+    image_path text,
+    category text,
+    severity text,
     published_at timestamptz,
     created_at timestamptz not null default now()
 );
 
+-- ============================================================
+-- FULL-TEXT SEARCH
+-- Tokenizes headline + all paragraph text into search_vector.
+-- The generated column maintains itself; the pipeline writes nothing.
+--
+-- FULL BACKOUT — run these 3 statements to remove FTS completely:
+--   drop index if exists fts_cybersecurity_news;
+--   alter table cybersecurity_news drop column if exists search_vector;
+--   drop function if exists story_search_text(text, jsonb);
+-- ============================================================
+
+create or replace function story_search_text(headline text, body jsonb)
+returns text language sql immutable as $$
+  select coalesce(headline, '') || ' ' || coalesce((
+    select string_agg(p->>'paragraph_text', ' ')
+    from jsonb_array_elements(body) p
+  ), '')
+$$;
+
+alter table cybersecurity_news add column if not exists search_vector tsvector
+  generated always as (to_tsvector('english', story_search_text(headline, story_body))) stored;
+
+create index if not exists fts_cybersecurity_news
+  on cybersecurity_news using gin (search_vector);
+
+-- ============================================================
+-- ROW LEVEL SECURITY
+-- ============================================================
+
 alter table tracked_rss_links enable row level security;
 alter table rss_articles enable row level security;
 alter table cybersecurity_news enable row level security;
+
+-- Public read access to published stories only.
+create policy "public read stories"
+on cybersecurity_news for select
+to anon
+using (true);

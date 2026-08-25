@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from pipeline.ingest import default_client, ingest_feeds, load_feeds
+from pipeline.retention import enforce_retention
 from pipeline.scrape import scrape_client, scrape_items
 from pipeline.supabase_export import connect, export_items, is_configured, known_urls
 from pipeline.synthesize import run_synthesis
@@ -89,6 +90,12 @@ def main() -> int:
     if db is not None and not args.no_synthesize:
         synthesis_stats = run_synthesis(db, dry_run=args.dry_run_synthesis)
 
+    # RETENTION: prune rows older than RETENTION_DAYS (0 disables).
+    # Comment out the call below to disable without touching retention.py.
+    retention_stats: dict = {}
+    if db is not None:
+        retention_stats = enforce_retention(db)
+
     report = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "feeds_configured": len(feeds),
@@ -99,6 +106,7 @@ def main() -> int:
         "supabase_configured": db is not None,
         "supabase_export": export_stats,
         "synthesis": synthesis_stats,
+        "retention": retention_stats,
         "feed_failures": failures,
         "items": [item.to_dict() for item in selected],
     }
@@ -110,6 +118,8 @@ def main() -> int:
     print(f"RSS items: {len(items)} unique={len(unique)}")
     print(f"Supabase: configured={db is not None} skipped_known={already_tracked} {export_stats}")
     print(f"Synthesis: { {k: v for k, v in synthesis_stats.items() if k != 'errors'} }")
+    if retention_stats:
+        print(f"Retention: {retention_stats}")
     if synthesis_stats.get("failed"):
         for error in synthesis_stats.get("errors", []):
             print(f"::warning::[synthesize] {error}")
@@ -140,6 +150,7 @@ def _write_github_summary(report: dict) -> None:
         f"- RSS items: {report['items_from_rss']} unique={report['unique_urls']}",
         f"- Supabase: configured={report['supabase_configured']} export={report['supabase_export']}",
         f"- Synthesis: { {k: v for k, v in report['synthesis'].items() if k != 'errors'} }",
+        f"- Retention: {report['retention']}",
         "",
     ]
     if report["synthesis"].get("failed"):

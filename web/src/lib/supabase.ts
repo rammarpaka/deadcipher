@@ -40,16 +40,37 @@ export function imageUrl(path: string | null | undefined): string | null {
   return `${base}/${path.replace(/^\//, "")}`;
 }
 
+// Builds a to_tsquery string: words AND-ed together; hyphenated
+// tokens containing digits (CVE ids) stay quoted as compound lexemes.
+function buildTsQuery(term: string): string {
+  return term
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) =>
+      t.includes("-")
+        ? /\d/.test(t)
+          ? `"${t}"`
+          : t.split("-").filter(Boolean).join(" & ")
+        : t,
+    )
+    .filter(Boolean)
+    .join(" & ");
+}
+
 export async function searchStories(q: string, limit = 20): Promise<Story[]> {
-  const term = q.replace(/[%,()]/g, " ").trim();
-  if (!term) return [];
+  // websearch-style input: strip chars that would break the PostgREST
+  // fts(...) filter envelope
+  const term = q.replace(/["'\\:()]/g, " ").replace(/\s+/g, " ").trim();
+  const query = buildTsQuery(term);
+  if (!query) return [];
   const { base, headers } = restConfig();
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
   url.searchParams.set(
     "select",
     "id,headline,story_body,image_path,category,severity,published_at,created_at",
   );
-  url.searchParams.set("headline", `ilike.*${term}*`);
+  url.searchParams.set("search_vector", `fts.${query}`);
   url.searchParams.set("order", "published_at.desc.nullslast");
   url.searchParams.set("limit", String(limit));
 

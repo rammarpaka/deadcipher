@@ -111,9 +111,32 @@ uv run python -m pipeline --no-synthesize    # ingest + scrape only
 uv run python -m pipeline --dry-run-synthesis  # show clusters, no LLM calls
 uv run python -m pipeline --max-items 30     # widen the ingest window
 
-# Backfill images for existing articles
-uv run python -m pipeline.backfill_images
+# Backfill utilities
+uv run python -m pipeline.backfill_images    # images for existing articles
+uv run python -m pipeline.classify_stories   # categories for existing stories
 ```
+
+## Search & Retention
+
+**Full-text search** uses a Postgres `tsvector` generated column
+(`search_vector`) that tokenizes the headline and every paragraph, with a GIN
+index. The `/search` page queries it through PostgREST with `websearch`
+syntax — quoted phrases (`"supply chain"`), `OR`, and `-exclusions` all work,
+with word stemming (searching "hacker" matches "hackers").
+
+To remove full-text search later, run the three backout statements at the
+bottom of the FTS block in `supabase/schema.sql` (drop index, drop column,
+drop function) and revert `searchStories` in `web/src/lib/supabase.ts` to a
+plain `ilike` filter.
+
+**Retention** keeps the free-tier database bounded: each run deletes stories,
+staged articles, and feed links older than `RETENTION_DAYS` (default **730** —
+2 years). At ~50 new stories/day the database stabilizes around ~220 MB,
+comfortably inside Supabase's 500 MB free cap.
+
+To disable retention: set `RETENTION_DAYS=0` (or comment out the
+`enforce_retention` call in `pipeline/run.py`). To change the window: set
+`RETENTION_DAYS` to any other number of days.
 
 ## Running the Web App Locally
 
@@ -158,7 +181,8 @@ npm run build
 ## Roadmap
 
 - [x] Story categories + severity badges (LLM-classified, filter tabs)
-- [ ] Full-text search across story bodies
+- [x] Full-text search across story bodies (Postgres tsvector + GIN)
+- [x] Data retention (2-year window, keeps the free tier bounded)
 - [ ] Today's Brief — daily generated summary
 - [ ] Manual content sections (articles, tutorials, tools)
 - [ ] Trending topic widgets from classification data
