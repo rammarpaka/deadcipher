@@ -123,12 +123,6 @@ export default async function StoryPage({ params }: Props) {
           ))}
         </article>
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-faint">
-          This report is an original synthesis generated from the public
-          sources cited inline above. Sentences are rewritten, not copied each
-          citation links back to the article its facts came from.
-        </p>
-
         <Link
           href="/"
           className="mt-8 inline-flex items-center gap-1.5 text-sm font-medium text-sky-500 hover:underline"

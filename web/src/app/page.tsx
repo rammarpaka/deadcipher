@@ -33,7 +33,7 @@ function StatusStrip({ stories }: { stories: Story[] }) {
         </span>
         {latest && <span>updated {timeAgo(latest)}</span>}
         <span className="ml-auto hidden font-mono text-[10px] uppercase tracking-widest text-faint lg:block">
-          AI-powered real-time threat intelligence
+          AI powered real-time threat intelligence
         </span>
       </div>
     </div>
@@ -89,9 +89,8 @@ export default async function Home() {
           </h1>
           <div className="mt-5 h-1 w-14 rounded-full bg-gradient-to-r from-rose-500 to-sky-500" />
           <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
-            We track the security web, connect the evidence, and surface what
-            actually matters — every paragraph linked to the article it came
-            from.
+            We connect the dots across the security web, turning scattered
+            signals into intelligence you can act on.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <a
