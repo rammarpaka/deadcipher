@@ -41,9 +41,11 @@ export function imageUrl(path: string | null | undefined): string | null {
 }
 
 // Builds a to_tsquery string: words AND-ed together; hyphenated
-// tokens containing digits (CVE ids) stay quoted as compound lexemes.
+// tokens containing digits (CVE ids) stay quoted as compound lexemes;
+// multi-word queries also OR in the concatenated form so split vendor
+// names ("key cloak") match single-word lexemes ("keycloak").
 function buildTsQuery(term: string): string {
-  return term
+  const tokens = term
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
@@ -54,8 +56,12 @@ function buildTsQuery(term: string): string {
           : t.split("-").filter(Boolean).join(" & ")
         : t,
     )
-    .filter(Boolean)
-    .join(" & ");
+    .filter(Boolean);
+  if (tokens.length === 0) return "";
+  if (tokens.length === 1) return tokens[0];
+  const and = tokens.join(" & ");
+  const concat = tokens.map((t) => t.replace(/"/g, "")).join("");
+  return `(${and}) | ${concat}`;
 }
 
 export async function searchStories(q: string, limit = 20): Promise<Story[]> {

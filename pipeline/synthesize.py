@@ -4,7 +4,7 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from supabase import Client
 
@@ -140,9 +140,15 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 def _same_event(a: Article, b: Article) -> bool:
     if a.cves and b.cves and a.cves & b.cves:
         return True
-    if abs(a.timestamp - b.timestamp) > CLUSTER_WINDOW_DAYS * 86400:
+    gap = abs(a.timestamp - b.timestamp)
+    if gap > CLUSTER_WINDOW_DAYS * 86400:
         return False
-    return _jaccard(_title_tokens(a.title), _title_tokens(b.title)) >= TITLE_JACCARD_THRESHOLD
+    # follow-up coverage within 24h often rewords the headline entirely —
+    # compare title + summary tokens with a relaxed threshold
+    tokens_a = _title_tokens(f"{a.title} {a.summary[:200]}")
+    tokens_b = _title_tokens(f"{b.title} {b.summary[:200]}")
+    threshold = 0.25 if gap <= 86400 else TITLE_JACCARD_THRESHOLD
+    return _jaccard(tokens_a, tokens_b) >= threshold
 
 
 def cluster_articles(articles: list[Article]) -> list[list[Article]]:
@@ -158,6 +164,36 @@ def cluster_articles(articles: list[Article]) -> list[list[Article]]:
         if not merged:
             clusters.append([article])
     return clusters
+
+
+def fetch_recent_stories(db: Client, hours: int = 24) -> list[Article]:
+    """Recently published stories, as pseudo-Articles for dedupe matching."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    result = (
+        db.table("cybersecurity_news")
+        .select("id,headline,story_body,published_at")
+        .gte("published_at", cutoff)
+        .order("published_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    articles: list[Article] = []
+    for row in result.data or []:
+        paragraphs = row.get("story_body") or []
+        summary = " ".join(
+            p.get("paragraph_text", "") for p in paragraphs[:1]
+        )
+        articles.append(
+            Article(
+                {
+                    "url": f"story:{row['id']}",
+                    "title": row.get("headline") or "",
+                    "summary": summary,
+                    "published_at": row.get("published_at"),
+                }
+            )
+        )
+    return articles
 
 
 def _llm_config() -> tuple[str, str, str]:
@@ -266,12 +302,38 @@ def _is_quota_error(exc: Exception) -> bool:
 
 
 def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = None) -> dict:
-    stats: dict = {"pending": 0, "clusters": 0, "published": 0, "failed": 0, "errors": []}
+    stats: dict = {
+        "pending": 0,
+        "clusters": 0,
+        "published": 0,
+        "failed": 0,
+        "deduped": 0,
+        "errors": [],
+    }
     max_clusters = max_clusters or _max_clusters_default()
     pending = fetch_pending(db)
     stats["pending"] = len(pending)
     if not pending:
         return stats
+
+    # dedupe: drop pending articles that match a story published in the
+    # last 24h (follow-up coverage of an already-synthesized event)
+    recent = fetch_recent_stories(db, hours=24)
+    dedupe_urls: list[str] = []
+    if recent:
+        kept: list[Article] = []
+        for article in pending:
+            if any(_same_event(article, story) for story in recent):
+                dedupe_urls.append(article.url)
+            else:
+                kept.append(article)
+        if dedupe_urls:
+            marked = datetime.now(timezone.utc).isoformat()
+            db.table("rss_articles").update({"synthesized_at": marked}).in_(
+                "url", dedupe_urls
+            ).execute()
+            stats["deduped"] = len(dedupe_urls)
+        pending = kept
 
     clusters = [c for c in cluster_articles(pending)][:max_clusters]
     stats["clusters"] = len(clusters)
