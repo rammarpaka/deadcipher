@@ -1,13 +1,26 @@
-﻿export type Citation = {
+export type Citation = {
   paragraph_text: string;
   citation_source_url: string;
 };
+
+export const CATEGORIES = [
+  "Malware",
+  "Vulnerabilities",
+  "Ransomware",
+  "Cloud Security",
+  "IoT Security",
+  "AI Security",
+  "Privacy",
+  "Data Breach",
+] as const;
 
 export type Story = {
   id: number;
   headline: string;
   story_body: Citation[];
   image_path: string | null;
+  category: string | null;
+  severity: string | null;
   published_at: string | null;
   created_at: string;
 };
@@ -34,7 +47,7 @@ export async function searchStories(q: string, limit = 20): Promise<Story[]> {
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
   url.searchParams.set(
     "select",
-    "id,headline,story_body,image_path,published_at,created_at",
+    "id,headline,story_body,image_path,category,severity,published_at,created_at",
   );
   url.searchParams.set("headline", `ilike.*${term}*`);
   url.searchParams.set("order", "published_at.desc.nullslast");
@@ -86,7 +99,7 @@ async function queryStories(limit: number, id?: number): Promise<Story[]> {
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
   url.searchParams.set(
     "select",
-    "id,headline,story_body,image_path,published_at,created_at",
+    "id,headline,story_body,image_path,category,severity,published_at,created_at",
   );
   if (id !== undefined) {
     url.searchParams.set("id", `eq.${id}`);

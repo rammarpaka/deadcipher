@@ -30,7 +30,7 @@ const FEATURES = [
 export default function SiteFooter() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="grid gap-6 sm:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.title} className="flex items-start gap-3">

@@ -157,7 +157,7 @@ npm run build
 
 ## Roadmap
 
-- [ ] Story categories + severity badges (LLM-classified, filter tabs)
+- [x] Story categories + severity badges (LLM-classified, filter tabs)
 - [ ] Full-text search across story bodies
 - [ ] Today's Brief — daily generated summary
 - [ ] Manual content sections (articles, tutorials, tools)

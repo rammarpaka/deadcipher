@@ -34,8 +34,25 @@ function Widget({
   );
 }
 
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 3,
+  high: 2,
+  medium: 1,
+  low: 0,
+};
+
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: "text-rose-500",
+  high: "text-orange-500",
+  medium: "text-amber-500",
+  low: "text-emerald-500",
+};
+
 function trendingCves(stories: Story[]) {
-  const counts = new Map<string, { hits: number; latest: string }>();
+  const counts = new Map<
+    string,
+    { hits: number; latest: string; severity: string | null }
+  >();
   const re = /CVE-\d{4}-\d{4,7}/gi;
   for (const story of stories) {
     const text = `${story.headline} ${story.story_body
@@ -44,17 +61,29 @@ function trendingCves(stories: Story[]) {
     for (const cve of text.match(re) ?? []) {
       const id = cve.toUpperCase();
       const prev = counts.get(id);
+      const severity =
+        story.severity &&
+        (!prev?.severity ||
+          SEVERITY_RANK[story.severity] > SEVERITY_RANK[prev.severity])
+          ? story.severity
+          : prev?.severity ?? null;
       counts.set(id, {
         hits: (prev?.hits ?? 0) + 1,
         latest:
           !prev?.latest || story.published_at! > prev.latest
             ? story.published_at!
             : prev.latest,
+        severity,
       });
     }
   }
   return [...counts.entries()]
-    .sort((a, b) => b[1].hits - a[1].hits || b[1].latest.localeCompare(a[1].latest))
+    .sort(
+      (a, b) =>
+        b[1].hits - a[1].hits ||
+        SEVERITY_RANK[b[1].severity ?? "low"] - SEVERITY_RANK[a[1].severity ?? "low"] ||
+        b[1].latest.localeCompare(a[1].latest),
+    )
     .slice(0, 5);
 }
 
@@ -99,8 +128,17 @@ export default function RightRail({ stories }: { stories: Story[] }) {
                   className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-surface2"
                 >
                   <span className="font-mono text-xs text-fg">{cve}</span>
-                  <span className="text-[11px] text-faint">
-                    {info.hits} mention{info.hits > 1 ? "s" : ""}
+                  <span className="flex items-center gap-2">
+                    {info.severity && (
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-widest ${SEVERITY_STYLES[info.severity] ?? ""}`}
+                      >
+                        {info.severity}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-faint">
+                      {info.hits} mention{info.hits > 1 ? "s" : ""}
+                    </span>
                   </span>
                 </a>
               </li>

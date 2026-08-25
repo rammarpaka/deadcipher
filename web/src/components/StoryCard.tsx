@@ -18,6 +18,13 @@ function Favicon({ domain }: { domain: string }) {
   );
 }
 
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: "bg-rose-500/10 text-rose-500 ring-rose-500/40",
+  high: "bg-orange-500/10 text-orange-500 ring-orange-500/40",
+  medium: "bg-amber-500/10 text-amber-500 ring-amber-500/40",
+  low: "bg-emerald-500/10 text-emerald-500 ring-emerald-500/40",
+};
+
 export default function StoryCard({
   story,
   featured = false,
@@ -34,7 +41,19 @@ export default function StoryCard({
   const image = imageUrl(story.image_path);
 
   const meta = (
-    <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+    <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+      {story.category && (
+        <span className="font-semibold tracking-widest text-sky-500">
+          {story.category}
+        </span>
+      )}
+      {story.severity && (
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ring-1 ${SEVERITY_STYLES[story.severity] ?? "bg-surface2 text-muted ring-line"}`}
+        >
+          {story.severity}
+        </span>
+      )}
       {featured && (
         <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 font-semibold tracking-widest text-sky-500">
           Latest
@@ -42,7 +61,7 @@ export default function StoryCard({
       )}
       <time dateTime={storyDate(story)}>{timeAgo(storyDate(story))}</time>
       <span aria-hidden>&middot;</span>
-      <span>
+      <span className="normal-case tracking-normal">
         {sources.length} source{sources.length > 1 ? "s" : ""}
       </span>
     </div>

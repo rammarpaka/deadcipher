@@ -20,6 +20,18 @@ REQUEST_SPACING_SECONDS = 4.0
 CVE_PATTERN = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
 MIN_PARAGRAPHS = 3
 
+CATEGORIES = (
+    "Malware",
+    "Vulnerabilities",
+    "Ransomware",
+    "Cloud Security",
+    "IoT Security",
+    "AI Security",
+    "Privacy",
+    "Data Breach",
+)
+SEVERITIES = ("critical", "high", "medium", "low")
+
 
 def _max_clusters_default() -> int:
     try:
@@ -42,8 +54,9 @@ STRICT RULES:
 4. Each paragraph must include exactly one "citation_source_url" taken verbatim from that source's "url" field.
 5. Spread the reporting across sources: consecutive paragraphs must cite DIFFERENT urls, and every provided source url must be cited at least once.
 6. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
-7. Respond with ONLY a JSON object, no markdown fences, matching:
-   {{"headline": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
+7. Classify the story: "category" must be exactly one of {categories}; "severity" must be exactly one of {severities} (critical = actively exploited or catastrophic impact; high = major campaigns or serious flaws; medium = standard patches and advisories; low = research, opinion, or minor news).
+8. Respond with ONLY a JSON object, no markdown fences, matching:
+   {{"headline": "...", "category": "...", "severity": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
 
 SOURCE ARTICLES:
 {sources}
@@ -166,7 +179,7 @@ def _llm_client():
     return OpenAI(api_key=api_key, base_url=base_url)
 
 
-def _validate_story(data: object, allowed_urls: set[str]) -> tuple[str, list[dict]] | None:
+def _validate_story(data: object, allowed_urls: set[str]) -> dict | None:
     if not isinstance(data, dict):
         return None
     headline = str(data.get("headline") or "").strip()
@@ -183,7 +196,14 @@ def _validate_story(data: object, allowed_urls: set[str]) -> tuple[str, list[dic
             cleaned.append({"paragraph_text": text, "citation_source_url": url})
     if not cleaned:
         return None
-    return headline, cleaned
+    story = {"headline": headline, "paragraphs": cleaned}
+    category = str(data.get("category") or "").strip()
+    if category in CATEGORIES:
+        story["category"] = category
+    severity = str(data.get("severity") or "").strip().lower()
+    if severity in SEVERITIES:
+        story["severity"] = severity
+    return story
 
 
 def _parse_json(text: str):
@@ -198,7 +218,7 @@ def _parse_json(text: str):
         return json.loads(re.sub(r",\s*([}\]])", r"\1", cleaned))
 
 
-def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> tuple[str, list[dict]]:
+def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> dict:
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -213,18 +233,25 @@ def _attempt(client, model: str, prompt: str, allowed_urls: set[str]) -> tuple[s
     return story
 
 
-def synthesize_cluster(client, cluster: list[Article]) -> tuple[str, list[dict]]:
+def synthesize_cluster(client, cluster: list[Article]) -> dict:
     sources = "\n\n".join(article.to_prompt_block() for article in cluster)
     allowed_urls = {a.url for a in cluster}
     _base_url, model, _api_key = _llm_config()
-    prompt = PROMPT_TEMPLATE.format(sources=sources)
+    prompt = PROMPT_TEMPLATE.format(
+        sources=sources,
+        categories=", ".join(CATEGORIES),
+        severities=", ".join(SEVERITIES),
+    )
     story = _attempt(client, model, prompt, allowed_urls)
-    if len(story[1]) < MIN_PARAGRAPHS:
+    if len(story["paragraphs"]) < MIN_PARAGRAPHS:
         try:
             story = _attempt(client, model, prompt + LENGTH_NUDGE, allowed_urls)
         except Exception:  # noqa: BLE001 — keep the shorter valid draft
             pass
-    single_cited = len(cluster) > 1 and len({p["citation_source_url"] for p in story[1]}) == 1
+    single_cited = (
+        len(cluster) > 1
+        and len({p["citation_source_url"] for p in story["paragraphs"]}) == 1
+    )
     if single_cited:
         try:
             story = _attempt(client, model, prompt + DIVERSITY_NUDGE, allowed_urls)
@@ -261,14 +288,21 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
     now_iso = datetime.now(timezone.utc).isoformat()
     for cluster in clusters:
         try:
-            headline, paragraphs = synthesize_cluster(llm, cluster)
+            story = synthesize_cluster(llm, cluster)
             dates = [iso for a in cluster if (iso := a.published_iso())]
-            payload = {"headline": headline, "story_body": paragraphs}
+            payload = {
+                "headline": story["headline"],
+                "story_body": story["paragraphs"],
+            }
             if dates:
                 payload["published_at"] = max(dates)
             image = next((a.image_path for a in cluster if a.image_path), "")
             if image:
                 payload["image_path"] = image
+            if story.get("category"):
+                payload["category"] = story["category"]
+            if story.get("severity"):
+                payload["severity"] = story["severity"]
             db.table("cybersecurity_news").insert(payload).execute()
             db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
                 "url", [a.url for a in cluster]

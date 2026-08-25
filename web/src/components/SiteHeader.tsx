@@ -22,7 +22,7 @@ export default function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
         <Logo />
 
         <form action="/search" className="relative mx-auto w-full max-w-md">

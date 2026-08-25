@@ -26,7 +26,7 @@ export default function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label="Toggle theme"
-      className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:text-fg"
+      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line text-muted transition-colors hover:text-fg"
     >
       {!mounted ? (
         <span className="h-4 w-4" />

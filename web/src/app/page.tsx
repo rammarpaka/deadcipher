@@ -1,6 +1,7 @@
 import SiteShell from "@/components/SiteShell";
-import StoryCard from "@/components/StoryCard";
+import CategoryFeed from "@/components/CategoryFeed";
 import RightRail from "@/components/RightRail";
+import { LogoMark } from "@/components/Logo";
 import { getStories, timeAgo, type Story } from "@/lib/supabase";
 
 export const revalidate = 60;
@@ -13,7 +14,7 @@ function StatusStrip({ stories }: { stories: Story[] }) {
 
   return (
     <div className="border-b border-line bg-surface/60">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5 text-xs text-muted">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5 text-xs text-muted">
         <span className="inline-flex items-center gap-2 font-semibold text-fg">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
@@ -44,26 +45,37 @@ export default async function Home() {
   let error: string | null = null;
 
   try {
-    stories = await getStories();
+    stories = await getStories(200);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load stories";
   }
 
-  // feature the newest story that has an image (falls back to newest overall)
-  const withImage = stories.findIndex((s) => s.image_path);
-  const featuredIdx = withImage !== -1 && withImage < 5 ? withImage : 0;
-  const featured = stories[featuredIdx];
-  const rest = stories.filter((_, i) => i !== featuredIdx);
+  const counts: Record<string, number> = {};
+  for (const s of stories) {
+    if (s.category) counts[s.category] = (counts[s.category] ?? 0) + 1;
+  }
+
+  // trim bodies for the page payload — feed cards only need excerpt + citations
+  const trimmed = stories.map((s) => ({
+    ...s,
+    story_body: s.story_body.slice(0, 3),
+  }));
 
   return (
     <SiteShell>
       {stories.length > 0 && !error && <StatusStrip stories={stories} />}
 
-      <main className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-14">
+      <main className="relative mx-auto w-full max-w-7xl px-4 pb-16 pt-14">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-72 text-faint dot-grid opacity-40 [mask-image:radial-gradient(ellipse_at_top,black,transparent_75%)]"
         />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-4 top-16 hidden opacity-15 xl:block"
+        >
+          <LogoMark size={220} />
+        </div>
         <div className="relative">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-500">
             Live threat intelligence
@@ -111,23 +123,10 @@ export default async function Home() {
           </div>
         )}
 
-        {!error && featured && (
+        {!error && stories.length > 0 && (
           <div className="mt-14 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div>
-              <StoryCard story={featured} featured />
-              <p
-                id="latest"
-                className="mt-12 scroll-mt-24 text-[11px] font-semibold uppercase tracking-[0.18em] text-faint"
-              >
-                Latest intelligence
-              </p>
-              <div className="mt-4 space-y-5">
-                {rest.map((story) => (
-                  <StoryCard key={story.id} story={story} />
-                ))}
-              </div>
-            </div>
-            <RightRail stories={stories} />
+            <CategoryFeed stories={trimmed} counts={counts} />
+            <RightRail stories={trimmed} />
           </div>
         )}
       </main>
