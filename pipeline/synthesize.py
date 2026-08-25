@@ -186,34 +186,71 @@ def cluster_articles(articles: list[Article]) -> list[list[Article]]:
     return clusters
 
 
-def fetch_recent_stories(db: Client, hours: int = 24) -> list[Article]:
-    """Recently published stories, as pseudo-Articles for dedupe matching."""
+def fetch_recent_stories(db: Client, hours: int = 24) -> list[dict]:
+    """Story rows published within the window, for dedupe + late merge."""
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     result = (
         db.table("cybersecurity_news")
-        .select("id,headline,story_body,published_at")
+        .select("id,headline,story_body,published_at,category,severity,image_path")
         .gte("published_at", cutoff)
         .order("published_at", desc=True)
         .limit(50)
         .execute()
     )
-    articles: list[Article] = []
-    for row in result.data or []:
-        paragraphs = row.get("story_body") or []
-        summary = " ".join(
-            p.get("paragraph_text", "") for p in paragraphs[:1]
-        )
-        articles.append(
-            Article(
-                {
-                    "url": f"story:{row['id']}",
-                    "title": row.get("headline") or "",
-                    "summary": summary,
-                    "published_at": row.get("published_at"),
-                }
-            )
-        )
-    return articles
+    return result.data or []
+
+
+def _story_to_article(row: dict) -> Article:
+    """Lightweight Article view of a published story, for dedupe matching."""
+    paragraphs = row.get("story_body") or []
+    summary = " ".join(p.get("paragraph_text", "") for p in paragraphs[:1])
+    return Article(
+        {
+            "url": f"story:{row['id']}",
+            "title": row.get("headline") or "",
+            "summary": summary,
+            "published_at": row.get("published_at"),
+        }
+    )
+
+
+def merge_into_story(
+    db: Client, llm, story_row: dict, new_articles: list[Article]
+) -> None:
+    """Re-synthesize an existing story with its original sources plus new
+    late-arriving coverage, updating the row in place."""
+    cited_urls = sorted(
+        {
+            p["citation_source_url"]
+            for p in story_row.get("story_body", [])
+            if p.get("citation_source_url")
+        }
+    )
+    original_rows = (
+        db.table("rss_articles")
+        .select("*")
+        .in_("url", cited_urls)
+        .limit(20)
+        .execute()
+        .data
+        or []
+    )
+    cluster = [Article(r) for r in original_rows] + list(new_articles)
+    if len(cluster) <= len(new_articles):
+        raise ValueError("original source articles unavailable for merge")
+    story = synthesize_cluster(llm, cluster)
+    payload: dict = {"story_body": story["paragraphs"]}
+    if story.get("category"):
+        payload["category"] = story["category"]
+    if story.get("severity"):
+        payload["severity"] = story["severity"]
+    if not story_row.get("image_path"):
+        image = next((a.image_path for a in new_articles if a.image_path), None)
+        if image:
+            payload["image_path"] = image
+    db.table("cybersecurity_news").update(payload).eq(
+        "id", story_row["id"]
+    ).execute()
 
 
 def _llm_config() -> tuple[str, str, str]:
@@ -328,6 +365,7 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
         "published": 0,
         "failed": 0,
         "deduped": 0,
+        "merged": 0,
         "errors": [],
     }
     max_clusters = max_clusters or _max_clusters_default()
@@ -336,24 +374,27 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
     if not pending:
         return stats
 
-    # dedupe: drop pending articles that match a story published in the
-    # last 24h (follow-up coverage of an already-synthesized event)
-    recent = fetch_recent_stories(db, hours=24)
+    # match pending articles against stories published in the last 24h
+    # (follow-up coverage of an already-synthesized event)
+    recent_rows = fetch_recent_stories(db, hours=24)
+    recent = [(_story_to_article(row), row) for row in recent_rows]
+    dedupe_groups: dict[int, dict] = {}
     dedupe_urls: list[str] = []
-    if recent:
-        kept: list[Article] = []
-        for article in pending:
-            if any(_same_event(article, story) for story in recent):
-                dedupe_urls.append(article.url)
-            else:
-                kept.append(article)
-        if dedupe_urls:
-            marked = datetime.now(timezone.utc).isoformat()
-            db.table("rss_articles").update({"synthesized_at": marked}).in_(
-                "url", dedupe_urls
-            ).execute()
-            stats["deduped"] = len(dedupe_urls)
-        pending = kept
+    kept: list[Article] = []
+    for article in pending:
+        match_row = next(
+            (row for art, row in recent if _same_event(article, art)), None
+        )
+        if match_row is None:
+            kept.append(article)
+            continue
+        dedupe_urls.append(article.url)
+        group = dedupe_groups.setdefault(
+            match_row["id"], {"row": match_row, "articles": [], "consumed": False}
+        )
+        group["articles"].append(article)
+    stats["deduped"] = len(dedupe_urls)
+    pending = kept
 
     clusters = [c for c in cluster_articles(pending)][:max_clusters]
     stats["clusters"] = len(clusters)
@@ -368,6 +409,40 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
 
     llm = _llm_client()
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    def _consume(urls: list[str]) -> None:
+        if urls:
+            db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
+                "url", urls
+            ).execute()
+
+    # LATE MERGE: enrich recently published stories with the new coverage
+    # instead of discarding it. Disable with LATE_MERGE=0 (falls back to
+    # plain suppression) if LLM rate limits become a problem.
+    late_merge_enabled = os.environ.get("LATE_MERGE", "1").lower() not in (
+        "0",
+        "false",
+    )
+    for story_id, group in dedupe_groups.items():
+        new_articles = group["articles"]
+        if late_merge_enabled:
+            try:
+                merge_into_story(db, llm, group["row"], new_articles)
+                stats["merged"] += len(new_articles)
+                print(
+                    f"[merge] story #{story_id} enriched with {len(new_articles)} new source(s)"
+                )
+            except Exception as exc:  # noqa: BLE001 — suppress on failure
+                stats["errors"].append(f"merge #{story_id}: {str(exc)[:150]}")
+                print(f"[merge] failed for story #{story_id}: {str(exc)[:120]}")
+            _consume([a.url for a in new_articles])
+            if stats["errors"] and _is_quota_error(Exception(stats["errors"][-1])):
+                stats["quota_exhausted"] = True
+                break
+            time.sleep(REQUEST_SPACING_SECONDS)
+        else:
+            _consume([a.url for a in new_articles])
+
     for cluster in clusters:
         try:
             story = synthesize_cluster(llm, cluster)

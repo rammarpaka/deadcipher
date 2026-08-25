@@ -138,6 +138,12 @@ To disable retention: set `RETENTION_DAYS=0` (or comment out the
 `enforce_retention` call in `pipeline/run.py`). To change the window: set
 `RETENTION_DAYS` to any other number of days.
 
+**Late merge**: when follow-up coverage of a recently published story arrives
+(within 24h), the story is **re-synthesized with all sources combined** instead
+of the follow-up being discarded — stories visibly gain sources and detail over
+their first day. Disable with `LATE_MERGE=0` if LLM rate limits become a
+problem (follow-ups are then suppressed, as before).
+
 ## Running the Web App Locally
 
 Requires Node.js 20+.
