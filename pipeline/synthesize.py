@@ -143,12 +143,32 @@ def _same_event(a: Article, b: Article) -> bool:
     gap = abs(a.timestamp - b.timestamp)
     if gap > CLUSTER_WINDOW_DAYS * 86400:
         return False
+    # fuzzy headline match catches reworded coverage
+    from difflib import SequenceMatcher
+
+    if (
+        SequenceMatcher(
+            None, a.title.lower(), b.title.lower()
+        ).ratio()
+        >= 0.45
+    ):
+        return True
     # follow-up coverage within 24h often rewords the headline entirely —
     # compare title + summary tokens with a relaxed threshold
     tokens_a = _title_tokens(f"{a.title} {a.summary[:200]}")
     tokens_b = _title_tokens(f"{b.title} {b.summary[:200]}")
-    threshold = 0.25 if gap <= 86400 else TITLE_JACCARD_THRESHOLD
-    return _jaccard(tokens_a, tokens_b) >= threshold
+    shared = tokens_a & tokens_b
+    if gap <= 86400:
+        if _jaccard(tokens_a, tokens_b) >= 0.25:
+            return True
+        # overlap coefficient + minimum shared-token floor: same event
+        # coverage shares the salient vocabulary (product, attack type)
+        if len(shared) >= 4 and len(shared) / min(len(tokens_a), len(tokens_b)) >= 0.3:
+            return True
+    else:
+        if _jaccard(tokens_a, tokens_b) >= TITLE_JACCARD_THRESHOLD:
+            return True
+    return False
 
 
 def cluster_articles(articles: list[Article]) -> list[list[Article]]:
