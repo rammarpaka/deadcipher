@@ -163,6 +163,19 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (safe for browsers; RLS restricts access) |
 | `NEXT_PUBLIC_IMAGE_CDN` | R2 public domain, e.g. `https://cdn.deadcipher.com` |
+| `FEED_LIMIT` | Stories fetched for the home feed + scroll-pagination batch size (default 100) |
+| `INFINITE_SCROLL` | `0` disables scroll pagination — feed becomes a single window (previous behavior) |
+
+**Feed window & pagination:** the home feed fetches the newest `FEED_LIMIT`
+stories; scrolling near the bottom auto-loads the next batch via
+`/api/stories` (cursor = last story's `published_at`), until history runs out.
+Category tabs and counts reflect the loaded window; older coverage is always
+reachable via search or direct links, and remains in the database until
+retention prunes it. To return to the previous single-window behavior, set
+`INFINITE_SCROLL=0` — the API route then returns empty batches and nothing
+else changes. (The refresh cadence is a code constant — `revalidate = 300` in
+`page.tsx`, matching the pipeline cron — not an env var, because Next.js
+requires it as a literal.)
 
 ```bash
 # 3. Start dev server

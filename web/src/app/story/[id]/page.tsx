@@ -27,7 +27,8 @@ function CitationFavicon({ domain }: { domain: string }) {
   );
 }
 
-export const revalidate = 60;
+// Matches the home feed cadence; see page.tsx for the rationale.
+export const revalidate = 300;
 
 type Props = { params: Promise<{ id: string }> };
 

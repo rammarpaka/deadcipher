@@ -4,7 +4,10 @@ import RightRail from "@/components/RightRail";
 import { LogoMark } from "@/components/Logo";
 import { getStories, timeAgo, type Story } from "@/lib/supabase";
 
-export const revalidate = 60;
+// Feed refresh cadence in seconds. 300 matches the pipeline's cron window —
+// new stories cannot exist more frequently, so visitors lose nothing.
+// (Next.js requires this to be a literal; change here + redeploy to adjust.)
+export const revalidate = 300;
 
 function StatusStrip({ stories }: { stories: Story[] }) {
   const sourceCount = new Set(
@@ -45,21 +48,10 @@ export default async function Home() {
   let error: string | null = null;
 
   try {
-    stories = await getStories(200);
+    stories = await getStories();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load stories";
   }
-
-  const counts: Record<string, number> = {};
-  for (const s of stories) {
-    if (s.category) counts[s.category] = (counts[s.category] ?? 0) + 1;
-  }
-
-  // trim bodies for the page payload — feed cards only need excerpt + citations
-  const trimmed = stories.map((s) => ({
-    ...s,
-    story_body: s.story_body.slice(0, 3),
-  }));
 
   return (
     <SiteShell>
@@ -124,8 +116,11 @@ export default async function Home() {
 
         {!error && stories.length > 0 && (
           <div className="mt-14 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <CategoryFeed stories={trimmed} counts={counts} />
-            <RightRail stories={trimmed} />
+            <CategoryFeed
+              stories={stories}
+              infiniteScroll={process.env.INFINITE_SCROLL !== "0"}
+            />
+            <RightRail stories={stories} />
           </div>
         )}
       </main>

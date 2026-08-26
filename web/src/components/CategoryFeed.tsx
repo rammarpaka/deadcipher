@@ -1,45 +1,84 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StoryCard from "@/components/StoryCard";
 import { CATEGORIES, type Story } from "@/lib/supabase";
 
 export default function CategoryFeed({
   stories,
-  counts,
+  infiniteScroll = true,
 }: {
   stories: Story[];
-  counts: Record<string, number>;
+  infiniteScroll?: boolean;
 }) {
+  // `stories` = initial window from the server render.
+  // `extra` = batches appended by scroll pagination (INFINITE_SCROLL).
+  const [extra, setExtra] = useState<Story[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(!infiniteScroll);
 
-  // restore category from URL hash (e.g. /#Malware) on load
-  useEffect(() => {
-    const hash = decodeURIComponent(window.location.hash.replace("#", ""));
-    if (CATEGORIES.includes(hash as (typeof CATEGORIES)[number])) {
-      setActive(hash);
-      document
-        .getElementById("latest")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const all = useMemo(() => {
+    const seen = new Set(stories.map((s) => s.id));
+    return [...stories, ...extra.filter((s) => !seen.has(s.id))];
+  }, [stories, extra]);
+
+  // counts re-tally from loaded stories so tab badges always match what
+  // the filter will actually return (they grow as batches append)
+  const loadedCounts = useMemo(() => {
+    const tally: Record<string, number> = {};
+    for (const s of all) {
+      if (s.category) tally[s.category] = (tally[s.category] ?? 0) + 1;
     }
-  }, []);
+    return tally;
+  }, [all]);
 
   const filtered = active
-    ? stories.filter((s) => s.category === active)
-    : stories;
+    ? all.filter((s) => s.category === active)
+    : all;
 
   const withImage = filtered.findIndex((s) => s.image_path);
   const featuredIdx = withImage !== -1 && withImage < 5 ? withImage : 0;
   const featured = filtered[featuredIdx];
   const rest = filtered.filter((_, i) => i !== featuredIdx);
 
+  const cursor = all.length ? all[all.length - 1].published_at : null;
+
+  async function loadMore() {
+    if (loading || done || !cursor) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/stories?before=${encodeURIComponent(cursor)}`,
+      );
+      if (!res.ok) throw new Error(String(res.status));
+      const data: { stories: Story[]; hasMore: boolean } = await res.json();
+      setExtra((prev) => [...prev, ...data.stories]);
+      if (!data.hasMore || data.stories.length === 0) setDone(true);
+    } catch {
+      setDone(true); // stop retrying; the feed still shows what loaded
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // auto-load when the sentinel scrolls into view
+  useEffect(() => {
+    if (!infiniteScroll || done) return;
+    const el = document.getElementById("feed-sentinel");
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) void loadMore();
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
   function select(category: string | null) {
     setActive(category);
-    window.history.replaceState(
-      null,
-      "",
-      category ? `/#${encodeURIComponent(category)}` : "/",
-    );
     requestAnimationFrame(() => {
       document
         .getElementById("latest")
@@ -69,8 +108,8 @@ export default function CategoryFeed({
             className={tabClass(active === cat)}
           >
             {cat}
-            {counts[cat] ? (
-              <span className="ml-1.5 text-faint">{counts[cat]}</span>
+            {loadedCounts[cat] ? (
+              <span className="ml-1.5 text-faint">{loadedCounts[cat]}</span>
             ) : null}
           </button>
         ))}
@@ -101,6 +140,16 @@ export default function CategoryFeed({
             ))}
           </div>
         </>
+      )}
+
+      {infiniteScroll && (
+        <div id="feed-sentinel" className="mt-8 text-center text-xs text-faint">
+          {loading
+            ? "Loading more stories..."
+            : done
+              ? "End of the feed — older coverage is searchable."
+              : "Scroll for more"}
+        </div>
       )}
     </div>
   );

@@ -34,6 +34,24 @@ export function cdnBase(): string {
   );
 }
 
+// ============================================================
+// FEED WINDOW + SHARED CARD PROJECTION
+// FEED_LIMIT: how many stories the home feed fetches (and the
+// scroll-pagination batch size). Raise it to surface more history
+// on the home page; lower it to trim payload. Default 100.
+// CARD_PARAGRAPHS: feed cards only need the excerpt + citations,
+// so bodies are trimmed to this many paragraphs in list payloads.
+// ============================================================
+export const FEED_LIMIT = Number(process.env.FEED_LIMIT || 100);
+const CARD_PARAGRAPHS = 3;
+
+export const STORY_FIELDS =
+  "id,headline,story_body,image_path,category,severity,published_at,created_at";
+
+export function toCardStory(row: Story): Story {
+  return { ...row, story_body: row.story_body.slice(0, CARD_PARAGRAPHS) };
+}
+
 export function imageUrl(path: string | null | undefined): string | null {
   const base = cdnBase();
   if (!path || !base) return null;
@@ -72,10 +90,7 @@ export async function searchStories(q: string, limit = 20): Promise<Story[]> {
   if (!query) return [];
   const { base, headers } = restConfig();
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
-  url.searchParams.set(
-    "select",
-    "id,headline,story_body,image_path,category,severity,published_at,created_at",
-  );
+  url.searchParams.set("select", STORY_FIELDS);
   url.searchParams.set("search_vector", `fts.${query}`);
   url.searchParams.set("order", "published_at.desc.nullslast");
   url.searchParams.set("limit", String(limit));
@@ -111,23 +126,22 @@ function restConfig(): { base: string; headers: HeadersInit } {
   };
 }
 
-export async function getStories(limit = 30): Promise<Story[]> {
+export async function getStories(limit = FEED_LIMIT): Promise<Story[]> {
   const rows = await queryStories(limit);
-  return rows.filter(
-    (story) =>
-      typeof story.headline === "string" &&
-      Array.isArray(story.story_body) &&
-      story.story_body.length > 0,
-  );
+  return rows
+    .filter(
+      (story) =>
+        typeof story.headline === "string" &&
+        Array.isArray(story.story_body) &&
+        story.story_body.length > 0,
+    )
+    .map(toCardStory);
 }
 
 async function queryStories(limit: number, id?: number): Promise<Story[]> {
   const { base, headers } = restConfig();
   const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/cybersecurity_news`);
-  url.searchParams.set(
-    "select",
-    "id,headline,story_body,image_path,category,severity,published_at,created_at",
-  );
+  url.searchParams.set("select", STORY_FIELDS);
   if (id !== undefined) {
     url.searchParams.set("id", `eq.${id}`);
   } else {
