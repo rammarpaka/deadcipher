@@ -77,6 +77,25 @@ export default function CategoryFeed({
     return () => observer.disconnect();
   });
 
+  // restore category from URL hash on load, and live-update when the hash
+  // changes (right-rail category links navigate to /#CategoryName)
+  useEffect(() => {
+    function applyHash() {
+      const hash = decodeURIComponent(window.location.hash.replace("#", ""));
+      setActive(
+        CATEGORIES.includes(hash as (typeof CATEGORIES)[number]) ? hash : null,
+      );
+      if (hash) {
+        document
+          .getElementById("latest")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
   function select(category: string | null) {
     setActive(category);
     requestAnimationFrame(() => {

@@ -60,6 +60,26 @@ create index if not exists fts_cybersecurity_news
   on cybersecurity_news using gin (search_vector);
 
 -- ============================================================
+-- TODAY'S BRIEF
+-- One LLM-generated editorial summary, refreshed when older than 12h
+-- by the pipeline (see pipeline/daily_brief.py). History is kept.
+-- ============================================================
+
+create table if not exists daily_brief (
+    id bigint generated always as identity primary key,
+    headline text not null,
+    summary text not null,
+    stats jsonb not null default '{}'::jsonb,
+    generated_at timestamptz not null default now()
+);
+
+alter table daily_brief enable row level security;
+create policy "public read brief"
+on daily_brief for select
+to anon
+using (true);
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 

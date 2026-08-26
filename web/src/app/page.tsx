@@ -1,8 +1,15 @@
 import SiteShell from "@/components/SiteShell";
+import BriefCard from "@/components/BriefCard";
 import CategoryFeed from "@/components/CategoryFeed";
 import RightRail from "@/components/RightRail";
 import { LogoMark } from "@/components/Logo";
-import { getStories, timeAgo, type Story } from "@/lib/supabase";
+import {
+  getLatestBrief,
+  getStories,
+  timeAgo,
+  type DailyBrief,
+  type Story,
+} from "@/lib/supabase";
 
 // Feed refresh cadence in seconds. 300 matches the pipeline's cron window —
 // new stories cannot exist more frequently, so visitors lose nothing.
@@ -46,9 +53,11 @@ function StatusStrip({ stories }: { stories: Story[] }) {
 export default async function Home() {
   let stories: Story[] = [];
   let error: string | null = null;
+  let brief: DailyBrief | null = null;
 
   try {
     stories = await getStories();
+    brief = await getLatestBrief().catch(() => null);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load stories";
   }
@@ -62,43 +71,44 @@ export default async function Home() {
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-72 text-faint dot-grid opacity-40 [mask-image:radial-gradient(ellipse_at_top,black,transparent_75%)]"
         />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-16 hidden opacity-15 xl:block"
-        >
-          <LogoMark size={220} />
-        </div>
-        <div className="relative">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-500">
-            Live threat intelligence
-          </p>
-          <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-[1.1] tracking-tight text-fg sm:text-5xl">
-            Cybersecurity intelligence,
-            <br />
-            <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-              without the noise.
-            </span>
-          </h1>
-          <div className="mt-5 h-1 w-14 rounded-full bg-gradient-to-r from-rose-500 to-sky-500" />
-          <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
-            We connect the dots across the security web, turning scattered
-            signals into intelligence you can act on.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <a
-              href="#latest"
-              className="inline-flex items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-85"
-            >
-              Explore latest intelligence
-              <span aria-hidden>&rarr;</span>
-            </a>
-            <a
-              href="#trending-cves"
-              className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-sky-500/60"
-            >
-              View trending CVEs
-            </a>
+        <div className="relative grid gap-10 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-500">
+              Live threat intelligence
+            </p>
+            <h1 className="mt-3 max-w-2xl text-4xl font-bold leading-[1.1] tracking-tight text-fg sm:text-5xl">
+              Cybersecurity intelligence,
+              <br />
+              <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+                without the noise.
+              </span>
+            </h1>
+            <div className="mt-5 h-1 w-14 rounded-full bg-gradient-to-r from-rose-500 to-sky-500" />
+            <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
+              We connect the dots across the security web, turning scattered
+              signals into intelligence you can act on.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <a
+                href="#latest"
+                className="inline-flex items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-85"
+              >
+                Explore latest intelligence
+                <span aria-hidden>&rarr;</span>
+              </a>
+              <a
+                href="#trending-cves"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-sky-500/60"
+              >
+                View trending CVEs
+              </a>
+            </div>
           </div>
+          {brief && (
+            <div className="hidden xl:block">
+              <BriefCard brief={brief} compact />
+            </div>
+          )}
         </div>
 
         {error && (
@@ -114,8 +124,14 @@ export default async function Home() {
           </div>
         )}
 
+        {!error && brief && (
+          <div className="mt-10 xl:hidden">
+            <BriefCard brief={brief} />
+          </div>
+        )}
+
         {!error && stories.length > 0 && (
-          <div className="mt-14 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="relative mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
             <CategoryFeed
               stories={stories}
               infiniteScroll={process.env.INFINITE_SCROLL !== "0"}

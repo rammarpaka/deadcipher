@@ -108,6 +108,37 @@ export async function searchStories(q: string, limit = 20): Promise<Story[]> {
   );
 }
 
+export type DailyBrief = {
+  id: number;
+  headline: string;
+  summary: string;
+  stats: {
+    stories_24h?: number;
+    critical?: number;
+    high?: number;
+    unique_cves?: number;
+    categories?: Record<string, number>;
+  };
+  generated_at: string;
+};
+
+export async function getLatestBrief(maxAgeHours = 36): Promise<DailyBrief | null> {
+  const { base, headers } = restConfig();
+  const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/daily_brief`);
+  url.searchParams.set("select", "id,headline,summary,stats,generated_at");
+  url.searchParams.set("order", "generated_at.desc");
+  url.searchParams.set("limit", "1");
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) return null;
+  const rows: DailyBrief[] = await res.json();
+  const brief = rows[0];
+  if (!brief) return null;
+  const ageH =
+    (Date.now() - new Date(brief.generated_at).getTime()) / 3_600_000;
+  return ageH <= maxAgeHours ? brief : null;
+}
+
 export function storyDate(story: Story): string {
   return story.published_at ?? story.created_at;
 }

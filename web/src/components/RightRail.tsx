@@ -168,6 +168,37 @@ export default function RightRail({ stories }: { stories: Story[] }) {
         </Widget>
       )}
 
+      {(() => {
+        const catCounts = new Map<string, number>();
+        for (const story of stories) {
+          if (story.category) {
+            catCounts.set(
+              story.category,
+              (catCounts.get(story.category) ?? 0) + 1,
+            );
+          }
+        }
+        const ranked = [...catCounts.entries()].sort((a, b) => b[1] - a[1]);
+        if (ranked.length === 0) return null;
+        return (
+          <Widget title="Intelligence by category">
+            <ul className="space-y-1">
+              {ranked.map(([cat, count]) => (
+                <li key={cat}>
+                  <a
+                    href={`/#${encodeURIComponent(cat)}`}
+                    className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-surface2"
+                  >
+                    <span className="text-xs text-muted">{cat}</span>
+                    <span className="text-[11px] text-faint">{count}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Widget>
+        );
+      })()}
+
       <Widget title="Popular resources">
         <ul className="space-y-1">
           {RESOURCES.map((r) => (

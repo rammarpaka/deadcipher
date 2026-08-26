@@ -96,6 +96,19 @@ def main() -> int:
     if db is not None:
         retention_stats = enforce_retention(db)
 
+    # TODAY'S BRIEF: daily LLM editorial summary. DAILY_BRIEF=0 disables.
+    brief_stats: dict = {}
+    if db is not None and not args.no_synthesize:
+        from pipeline.daily_brief import generate_if_stale, is_enabled
+
+        if is_enabled():
+            try:
+                brief_stats = generate_if_stale(db)
+                print(f"Daily brief: {brief_stats}")
+            except Exception as exc:  # noqa: BLE001 — never break the run
+                brief_stats = {"state": "failed", "error": str(exc)[:200]}
+                print(f"[daily-brief] failed: {str(exc)[:120]}")
+
     report = {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "feeds_configured": len(feeds),
@@ -107,6 +120,7 @@ def main() -> int:
         "supabase_export": export_stats,
         "synthesis": synthesis_stats,
         "retention": retention_stats,
+        "daily_brief": brief_stats,
         "feed_failures": failures,
         "items": [item.to_dict() for item in selected],
     }
@@ -120,6 +134,7 @@ def main() -> int:
     print(f"Synthesis: { {k: v for k, v in synthesis_stats.items() if k != 'errors'} }")
     if retention_stats:
         print(f"Retention: {retention_stats}")
+    print(f"Daily brief: {brief_stats}")
     if synthesis_stats.get("failed"):
         for error in synthesis_stats.get("errors", []):
             print(f"::warning::[synthesize] {error}")
