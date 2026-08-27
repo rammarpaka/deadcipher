@@ -21,6 +21,8 @@ export type Story = {
   image_path: string | null;
   category: string | null;
   severity: string | null;
+  recommended_action: string | null;
+  why_it_matters: string | null;
   published_at: string | null;
   created_at: string;
 };
@@ -46,7 +48,7 @@ export const FEED_LIMIT = Number(process.env.FEED_LIMIT || 100);
 const CARD_PARAGRAPHS = 3;
 
 export const STORY_FIELDS =
-  "id,headline,story_body,image_path,category,severity,published_at,created_at";
+  "id,headline,story_body,image_path,category,severity,recommended_action,why_it_matters,published_at,created_at";
 
 export function toCardStory(row: Story): Story {
   return { ...row, story_body: row.story_body.slice(0, CARD_PARAGRAPHS) };

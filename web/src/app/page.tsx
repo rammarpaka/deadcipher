@@ -88,21 +88,15 @@ export default async function Home() {
               We connect the dots across the security web, turning scattered
               signals into intelligence you can act on.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <a
-                href="#latest"
-                className="inline-flex items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-85"
-              >
-                Explore latest intelligence
-                <span aria-hidden>&rarr;</span>
-              </a>
-              <a
-                href="#trending-cves"
-                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-fg transition-colors hover:border-sky-500/60"
-              >
-                View trending CVEs
-              </a>
-            </div>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <a
+              href="#latest"
+              className="inline-flex items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-85"
+            >
+              Explore latest intelligence
+              <span aria-hidden>&rarr;</span>
+            </a>
+          </div>
           </div>
           {brief && (
             <div className="hidden xl:block">

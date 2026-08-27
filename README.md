@@ -144,6 +144,17 @@ of the follow-up being discarded — stories visibly gain sources and detail ove
 their first day. Disable with `LATE_MERGE=0` if LLM rate limits become a
 problem (follow-ups are then suppressed, as before).
 
+**Internal CVE pages**: every CVE mentioned in story text links to an internal
+`/cve/[id]` page aggregating all coverage of that vulnerability (severity,
+source count, related reports) with NVD/CISA links. Disable with
+`CVE_PAGES=0` (CVE mentions then link to NVD externally).
+
+**AI impact insights**: critical/high stories carry an actionable insight
+(who is affected + immediate action) generated during synthesis and shown in
+a sidebar pane on the story page. Disable with `IMPACT_INSIGHTS=0`;
+backfill existing stories with
+`uv run python -m pipeline.backfill_impact`.
+
 ## Running the Web App Locally
 
 Requires Node.js 20+.
@@ -202,6 +213,7 @@ npm run build
 - [x] Story categories + severity badges (LLM-classified, filter tabs)
 - [x] Full-text search across story bodies (Postgres tsvector + GIN)
 - [x] Data retention (2-year window, keeps the free tier bounded)
-- [ ] Today's Brief — daily generated summary
+- [x] Internal CVE pages + AI impact insights on critical/high stories
+- [x] Today's Brief — daily generated summary
 - [ ] Manual content sections (articles, tutorials, tools)
 - [ ] Trending topic widgets from classification data

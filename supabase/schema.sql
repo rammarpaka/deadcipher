@@ -30,6 +30,8 @@ create table if not exists cybersecurity_news (
     image_path text,
     category text,
     severity text,
+    recommended_action text,
+    why_it_matters text,
     published_at timestamptz,
     created_at timestamptz not null default now()
 );

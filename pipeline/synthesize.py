@@ -55,8 +55,13 @@ STRICT RULES:
 5. Spread the reporting across sources: consecutive paragraphs must cite DIFFERENT urls, and every provided source url must be cited at least once.
 6. If sources conflict, state the disagreement neutrally and cite both sides in separate sentences.
 7. Classify the story: "category" must be exactly one of {categories}; "severity" must be exactly one of {severities} (critical = actively exploited or catastrophic impact; high = major campaigns or serious flaws; medium = standard patches and advisories; low = research, opinion, or minor news).
-8. Respond with ONLY a JSON object, no markdown fences, matching:
-   {{"headline": "...", "category": "...", "severity": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
+8. ONLY if severity is critical or high, add BOTH:
+   - "recommended_action": ONE sentence (max 220 chars) stating who must act and the immediate action, addressed to the READER (security teams, administrators, users at large) — never describe one specific organization's own response. Never use semicolons. Grounded strictly in the sources.
+   - "why_it_matters": ONE sentence (max 220 chars) explaining the consequence if unaddressed. Never use semicolons.
+   For other severities omit both keys entirely.
+9. Respond with ONLY a JSON object, no markdown fences, matching:
+   {{"headline": "...", "category": "...", "severity": "...", "recommended_action": "...", "why_it_matters": "...", "paragraphs": [{{"paragraph_text": "...", "citation_source_url": "..."}}, ...]}}
+   (action keys present only per rule 8)
 
 SOURCE ARTICLES:
 {sources}
@@ -296,6 +301,13 @@ def _validate_story(data: object, allowed_urls: set[str]) -> dict | None:
     severity = str(data.get("severity") or "").strip().lower()
     if severity in SEVERITIES:
         story["severity"] = severity
+    if severity in ("critical", "high"):
+        clean = lambda s: re.sub(r";\s*", ". ", str(s or "").strip())
+        action = clean(data.get("recommended_action"))
+        why = clean(data.get("why_it_matters"))
+        if action and why:
+            story["recommended_action"] = action[:300]
+            story["why_it_matters"] = why[:300]
     return story
 
 
@@ -460,6 +472,10 @@ def run_synthesis(db: Client, dry_run: bool = False, max_clusters: int | None = 
                 payload["category"] = story["category"]
             if story.get("severity"):
                 payload["severity"] = story["severity"]
+            if story.get("recommended_action"):
+                payload["recommended_action"] = story["recommended_action"]
+            if story.get("why_it_matters"):
+                payload["why_it_matters"] = story["why_it_matters"]
             db.table("cybersecurity_news").insert(payload).execute()
             db.table("rss_articles").update({"synthesized_at": now_iso}).in_(
                 "url", [a.url for a in cluster]

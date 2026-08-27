@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { Story } from "@/lib/supabase";
 import { sourceDomain } from "@/lib/supabase";
 
@@ -121,10 +123,8 @@ export default function RightRail({ stories }: { stories: Story[] }) {
           <ul className="space-y-2">
             {cves.map(([cve, info]) => (
               <li key={cve}>
-                <a
-                  href={`https://nvd.nist.gov/vuln/detail/${cve}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={`/cve/${cve}`}
                   className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-surface2"
                 >
                   <span className="font-mono text-xs text-fg">{cve}</span>
@@ -140,7 +140,7 @@ export default function RightRail({ stories }: { stories: Story[] }) {
                       {info.hits} mention{info.hits > 1 ? "s" : ""}
                     </span>
                   </span>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
