@@ -57,7 +57,7 @@ export default function SiteFooter() {
           ))}
         </div>
         <div className="mt-8 flex items-center justify-between border-t border-line pt-6 text-xs text-faint">
-          <Logo size={20} />
+          <Logo size={28} />
           <span>&copy; {new Date().getFullYear()} deadcipher</span>
         </div>
       </div>

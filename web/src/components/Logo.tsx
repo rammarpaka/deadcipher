@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function LogoMark({ size = 28 }: { size?: number }) {
+export function LogoMark({ size = 36 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -45,11 +45,16 @@ export function LogoMark({ size = 28 }: { size?: number }) {
   );
 }
 
-export default function Logo({ size = 28 }: { size?: number }) {
+export default function Logo({ size = 36 }: { size?: number }) {
+  const textClass =
+    size >= 32 ? "text-xl" : size >= 24 ? "text-base" : "text-sm";
+
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2.5">
+    <Link href="/" className="flex shrink-0 items-center gap-3">
       <LogoMark size={size} />
-      <span className="font-semibold tracking-tight text-fg">deadcipher</span>
+      <span className={`font-semibold tracking-tight text-fg ${textClass}`}>
+        deadcipher
+      </span>
     </Link>
   );
 }
