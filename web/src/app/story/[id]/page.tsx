@@ -40,12 +40,12 @@ function renderWithCveLinks(text: string) {
   });
 }
 
-function SparkIcon() {
+function SparkIcon({ className }: { className?: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 2.5l1.6 4.2L18 8.2l-4.4 1.5L12 14.5l-1.6-4.8L6 8.2l4.4-1.5L12 2.5z" fill="#F59E0B" />
-      <path d="M19 10.5l0.9 1.9 1.9 0.9-1.9 0.9-0.9 1.9-0.9-1.9-1.9-0.9 1.9-0.9 0.9-1.9z" fill="#F59E0B" />
-      <path d="M5.5 14.5l0.7 1.4 1.4 0.7-1.4 0.7-0.7 1.4-0.7-1.4-1.4-0.7 1.4-0.7 0.7-1.4z" fill="#F59E0B" opacity="0.85" />
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 2.5l1.6 4.2L18 8.2l-4.4 1.5L12 14.5l-1.6-4.8L6 8.2l4.4-1.5L12 2.5z" fill="currentColor" />
+      <path d="M19 10.5l0.9 1.9 1.9 0.9-1.9 0.9-0.9 1.9-0.9-1.9-1.9-0.9 1.9-0.9 0.9-1.9z" fill="currentColor" />
+      <path d="M5.5 14.5l0.7 1.4 1.4 0.7-1.4 0.7-0.7 1.4-0.7-1.4-1.4-0.7 1.4-0.7 0.7-1.4z" fill="currentColor" opacity="0.85" />
     </svg>
   );
 }
@@ -109,8 +109,15 @@ export default async function StoryPage({ params }: Props) {
   const action = INSIGHTS_ENABLED ? story.recommended_action : null;
   const whyItMatters = INSIGHTS_ENABLED ? story.why_it_matters : null;
   const hasInsight = Boolean(action || whyItMatters);
+  const urgent = ["critical", "high"].includes((story.severity ?? "").toLowerCase());
   const severityChip = story.severity ? (
-    <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 ring-1 ring-amber-500/20">
+    <span
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ring-1 ${
+        urgent
+          ? "bg-red-500/10 text-red-600 ring-red-500/25 dark:text-red-400 dark:ring-red-400/25"
+          : "bg-amber-500/10 text-amber-600 ring-amber-500/20 dark:text-amber-400 dark:ring-amber-400/25"
+      }`}
+    >
       {story.severity} &middot; action required
     </span>
   ) : null;
@@ -193,29 +200,55 @@ export default async function StoryPage({ params }: Props) {
 
           {(action || whyItMatters) && (
             <aside className="lg:sticky lg:top-20">
-              <div className="overflow-hidden rounded-2xl border border-amber-100 bg-white shadow-sm dark:border-amber-500/20 dark:bg-gradient-to-b dark:from-amber-500/[0.06] dark:to-transparent">
-                <div className="flex flex-nowrap items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/50 px-4 py-3.5 dark:border-line dark:bg-surface">
-                  <p className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-bold tracking-wide text-zinc-900 dark:text-fg">
-                    <SparkIcon />
+              <div
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-surface dark:shadow-none dark:ring-1 ${
+                  urgent
+                    ? "border-red-200 dark:border-red-500/25 dark:ring-red-500/10"
+                    : "border-amber-200 dark:border-amber-500/20 dark:ring-amber-500/10"
+                }`}
+              >
+                <div
+                  className={`flex flex-nowrap items-center justify-between gap-2 border-b px-4 py-3.5 ${
+                    urgent
+                      ? "border-red-100 bg-red-50 dark:border-red-500/15 dark:bg-red-400/[0.07]"
+                      : "border-amber-100 bg-amber-50 dark:border-amber-500/15 dark:bg-amber-400/[0.07]"
+                  }`}
+                >
+                  <p
+                    className={`flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-bold tracking-wide text-zinc-900 ${
+                      urgent ? "dark:text-red-100" : "dark:text-amber-100"
+                    }`}
+                  >
+                    <SparkIcon className={urgent ? "text-red-500 dark:text-red-400" : "text-amber-500 dark:text-amber-400"} />
                     AI Insight
                   </p>
                   <span className="shrink-0">{severityChip}</span>
                 </div>
 
-                <div className="divide-y divide-amber-100/60 dark:divide-line/60">
+                <div className={`divide-y ${urgent ? "divide-red-100 dark:divide-red-500/15" : "divide-amber-100 dark:divide-amber-500/15"}`}>
                   {action && (
-                    <div className="bg-amber-50/30 p-5 dark:bg-amber-500/[0.03]">
-                      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/15">
+                    <div className={`p-5 ${urgent ? "bg-red-50/40 dark:bg-red-400/[0.04]" : "bg-amber-50/40 dark:bg-amber-400/[0.04]"}`}>
+                      <p
+                        className={`flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest ${
+                          urgent ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                            urgent
+                              ? "bg-red-100 text-red-600 dark:bg-red-400/15 dark:text-red-400"
+                              : "bg-amber-100 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400"
+                          }`}
+                        >
                           <ShieldIcon />
                         </span>
                         Recommended action
                       </p>
-                      <p className="mt-3 text-[15px] font-semibold leading-relaxed text-zinc-900 dark:text-fg">
+                      <p className="mt-3 text-[15px] font-semibold leading-relaxed text-zinc-900 dark:text-zinc-100">
                         {action.split('. ')[0]}.
                       </p>
                       {action.includes('. ') && (
-                        <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-muted">
+                        <p className="mt-2 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
                           {action.split('. ').slice(1).join('. ')}
                         </p>
                       )}
@@ -223,13 +256,13 @@ export default async function StoryPage({ params }: Props) {
                   )}
                   {whyItMatters && (
                     <div className="bg-white p-5 dark:bg-transparent">
-                      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500 dark:text-faint">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-surface2 dark:text-faint">
+                      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                           <AlertIcon />
                         </span>
                         Why it matters
                       </p>
-                      <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-muted">{whyItMatters}</p>
+                      <p className="mt-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{whyItMatters}</p>
                     </div>
                   )}
                 </div>
